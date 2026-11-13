@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script>try { const t = localStorage.getItem('sr-tema'); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
 </head>
 <body>
   <header class="topbar">
@@ -24,6 +25,7 @@
       <a href="magalu/">Magalu</a>
       <a href="#assistente" data-ir="assistente">Assistente</a>
       <a href="#usuarios" data-ir="usuarios" id="nav-admin" hidden>Usuários</a>
+      <a href="#configuracoes" data-ir="configuracoes">Configurações</a>
     </nav>
     <div id="user-box" class="user-box" hidden>
       <span id="user-email"></span>
@@ -113,8 +115,115 @@
       <div class="chat-opcoes">
         <label class="check"><input id="ctx-precos" type="checkbox" checked> Usar meus dados de preços (Shopping Radar)</label>
         <label class="check"><input id="ctx-magalu" type="checkbox"> Usar dados de vendas da Magalu</label>
+        <small id="chat-uso" class="muted"></small>
       </div>
       <p class="muted chat-aviso">No plano gratuito do Gemini, o Google pode usar o conteúdo enviado para melhorar os serviços dele. Marque os dados só quando precisar deles na resposta.</p>
+    </section>
+  </main>
+
+  <!-- Configurações -->
+  <main id="view-configuracoes" class="config" hidden>
+    <p id="cfg-aviso" class="banner" hidden></p>
+
+    <section class="panel">
+      <h2>Minhas preferências</h2>
+      <p class="muted">Valem só para a sua conta, em qualquer computador.</p>
+      <form id="form-pref" class="cfg-grid">
+        <label>Tema
+          <select id="pref-tema">
+            <option value="">Automático (segue o sistema)</option>
+            <option value="light">Claro</option>
+            <option value="dark">Escuro</option>
+          </select>
+        </label>
+        <label>Meu preço de referência
+          <input id="pref-preco" inputmode="decimal" placeholder="Ex.: 952,00">
+          <small class="dica">Já vem preenchido no filtro "Seu preço" da aba Preços.</small>
+        </label>
+        <label>Marketplace padrão no filtro
+          <select id="pref-market"><option value="">Todos</option></select>
+        </label>
+        <div class="cfg-acoes"><button class="primary" type="submit">Salvar preferências</button><span id="pref-msg" class="msg" role="status"></span></div>
+      </form>
+      <div class="zona-perigo">
+        <div><b>Apagar meus dados de preços</b><small>Remove todas as importações e envios da extensão desta conta. Não dá para desfazer.</small></div>
+        <button id="pref-apagar" class="danger" type="button">Apagar tudo</button>
+      </div>
+    </section>
+
+    <section class="panel so-admin" hidden>
+      <h2>Assistente IA <span class="selo">Admin</span></h2>
+      <p class="muted">Vale para todos os usuários da aba Assistente.</p>
+      <form id="form-assistente" class="cfg-grid">
+        <label class="check cfg-linha"><input id="as-ativo" type="checkbox"> Assistente ligado</label>
+        <label>Modelo do Gemini
+          <input id="as-modelo" list="modelos-gemini" placeholder="Automático (recomendado)">
+          <datalist id="modelos-gemini">
+            <option value="gemini-3.8-flash">Rápido e bom (padrão)</option>
+            <option value="gemini-3.8-flash-lite">Mais leve, quase nunca sobrecarrega</option>
+          </datalist>
+          <small class="dica">Deixe vazio para o automático. Se o Google trocar o nome do modelo, o assistente se ajusta sozinho.</small>
+        </label>
+        <label>Limite de perguntas por usuário por dia
+          <input id="as-limite" type="number" min="0" max="10000" step="1">
+          <small class="dica">0 = sem limite. Admins não têm limite.</small>
+        </label>
+        <label><span>Criatividade: <b id="as-temp-valor"></b></span>
+          <input id="as-temp" type="range" min="0" max="1" step="0.1">
+          <small class="dica">Mais baixo = respostas mais exatas e repetíveis. Mais alto = mais ideias.</small>
+        </label>
+        <label class="cfg-linha">Instruções fixas da loja
+          <textarea id="as-instrucoes" rows="5" maxlength="4000" placeholder="Ex.: Somos a loja X, vendemos ferramentas elétricas. Margem mínima de 18%. Nunca sugira preço abaixo do custo + frete. Tom de voz: direto e simpático."></textarea>
+          <small class="dica">A IA segue isso em todas as respostas. Não coloque senhas nem dados pessoais.</small>
+        </label>
+        <div class="cfg-acoes"><button class="primary" type="submit">Salvar assistente</button><span id="as-msg" class="msg" role="status"></span></div>
+      </form>
+      <h3 class="cfg-sub">Uso hoje</h3>
+      <div id="as-uso" class="snap-list"></div>
+    </section>
+
+    <section class="panel so-admin" hidden>
+      <h2>Acesso e cadastro <span class="selo">Admin</span></h2>
+      <p class="muted">Quem pode entrar no painel, na extensão e nos dados da Magalu.</p>
+      <form id="form-acesso" class="cfg-grid">
+        <label class="check cfg-linha"><input id="ac-cadastro" type="checkbox"> Mostrar "Criar conta" na tela de login</label>
+        <label class="cfg-linha">Aprovar automaticamente e-mails destes domínios
+          <input id="ac-dominios" placeholder="Ex.: suaempresa.com.br, outraempresa.com">
+          <small class="dica">Separe por vírgula. Contas com esses e-mails já entram aprovadas (depois de confirmar o e-mail). Deixe vazio para aprovar tudo manualmente.</small>
+        </label>
+        <label class="cfg-linha">Mensagem da tela "Aguardando aprovação"
+          <textarea id="ac-mensagem" rows="3" maxlength="600" placeholder="Ex.: Fale com o gerente comercial pelo WhatsApp para liberar seu acesso."></textarea>
+          <small class="dica">Vazio = mensagem padrão.</small>
+        </label>
+        <div class="cfg-acoes"><button class="primary" type="submit">Salvar acesso</button><span id="ac-msg" class="msg" role="status"></span></div>
+      </form>
+    </section>
+
+    <section class="panel so-admin" hidden>
+      <h2>Extensão e coleta <span class="selo">Admin</span></h2>
+      <p class="muted">A extensão de cada usuário conectado puxa estes ajustes sozinha (em até 1 hora, ou na hora ao clicar em "Enviar agora").</p>
+      <form id="form-extensao" class="cfg-grid">
+        <label>Modo de leitura dos anúncios
+          <select id="ex-modo">
+            <option value="usuario">Cada usuário escolhe na extensão</option>
+            <option value="rapida">Sem abas (rápido, padrão)</option>
+            <option value="completa">Completa (janela minimizada, mais dados)</option>
+          </select>
+        </label>
+        <label>Preço padrão do "Seu preço"
+          <input id="ex-preco" inputmode="decimal" placeholder="Opcional. Ex.: 952,00">
+          <small class="dica">Preenche o campo nos painéis da extensão quando estiver vazio.</small>
+        </label>
+        <label class="cfg-linha">Nome(s) da sua loja
+          <input id="ex-lojas" placeholder="Ex.: Levanti Máquinas, Levanti Oficial">
+          <small class="dica">Ofertas desses vendedores ganham a marca "NOSSO". Separe por vírgula.</small>
+        </label>
+        <fieldset class="cfg-linha">
+          <legend>Marketplaces ativos <small class="dica">(nenhum marcado = todos)</small></legend>
+          <div id="ex-markets" class="cfg-checks"></div>
+        </fieldset>
+        <div class="cfg-acoes"><button class="primary" type="submit">Salvar extensão</button><span id="ex-msg" class="msg" role="status"></span></div>
+      </form>
     </section>
   </main>
 
@@ -198,5 +307,6 @@
   <script src="processamento.js"></script>
   <script src="app.js"></script>
   <script src="assistente.js"></script>
+  <script src="configuracoes.js"></script>
 </body>
 </html>

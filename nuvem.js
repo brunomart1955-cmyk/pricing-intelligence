@@ -14,6 +14,7 @@ const NUVEM = {
   painel: 'https://brunomart1955-cmyk.github.io/pricing-intelligence/painel/'
 };
 const NUVEM_ALARME = 'nuvem-sync';
+const NUVEM_ALARME_CONFIG = 'nuvem-config';
 const CHAVES_DADOS = ['shoppingRadarData', 'marketplaceRadarData'];
 
 const storageGet = keys => chrome.storage.local.get(keys);
@@ -51,7 +52,33 @@ async function nuvemLogin(email, senha) {
   const sessao = await authRequest('password', { email, password: senha });
   await storageSet({ nuvemSessao: sessao });
   await nuvemStatus({ conectado: true, email: sessao.email, erro: '' });
+  await nuvemPuxarConfig(sessao.access_token);
   return nuvemSincronizar({ forcar: true });
+}
+
+// Configurações definidas pelo admin no painel (aba Configurações → Extensão e coleta).
+// Ficam em radarConfig.nuvem e são lidas pelos painéis dos marketplaces e pelo background.
+async function nuvemPuxarConfig(token) {
+  try {
+    token = token || await tokenValido();
+    if (!token) return;
+    const resp = await fetch(`${NUVEM.url}/rest/v1/configuracoes?chave=eq.extensao&select=valor`, {
+      headers: { apikey: NUVEM.chave, Authorization: `Bearer ${token}` }
+    });
+    if (!resp.ok) return; // tabela ainda não criada ou conta sem acesso: mantém o que tinha
+    const [linha] = await resp.json();
+    const v = linha?.valor || {};
+    const nuvem = {
+      modoLeitura: ['rapida', 'completa'].includes(v.modoLeitura) ? v.modoLeitura : 'usuario',
+      marketplacesAtivos: Array.isArray(v.marketplacesAtivos) ? v.marketplacesAtivos.map(String) : [],
+      nomesLoja: Array.isArray(v.nomesLoja) ? v.nomesLoja.map(String).filter(Boolean) : [],
+      precoPadrao: typeof v.precoPadrao === 'number' && v.precoPadrao > 0 ? v.precoPadrao : null
+    };
+    const { radarConfig = {} } = await storageGet('radarConfig');
+    if (JSON.stringify(radarConfig.nuvem) !== JSON.stringify(nuvem)) await storageSet({ radarConfig: { ...radarConfig, nuvem } });
+  } catch (e) {
+    console.warn('Configurações da nuvem não carregadas', e);
+  }
 }
 
 async function nuvemLogout() {
@@ -62,6 +89,9 @@ async function nuvemLogout() {
     }).catch(() => {});
   }
   await chrome.storage.local.remove(['nuvemSessao', 'nuvemSync']);
+  // Sem conta conectada, volta aos padrões da extensão.
+  const { radarConfig = {} } = await storageGet('radarConfig');
+  if (radarConfig.nuvem) { delete radarConfig.nuvem; await storageSet({ radarConfig }); }
   await storageSet({ nuvemStatus: { conectado: false } });
 }
 
@@ -168,6 +198,12 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 
 chrome.alarms.onAlarm.addListener(alarme => {
   if (alarme.name === NUVEM_ALARME) void nuvemSincronizar();
+  if (alarme.name === NUVEM_ALARME_CONFIG) void nuvemPuxarConfig();
+});
+
+// Confere as configurações do admin de hora em hora (sem reiniciar o relógio a cada despertar).
+chrome.alarms.get(NUVEM_ALARME_CONFIG).then(a => {
+  if (!a) chrome.alarms.create(NUVEM_ALARME_CONFIG, { delayInMinutes: 1, periodInMinutes: 60 });
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -176,7 +212,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     if (tipo === 'nuvem-login') return nuvemLogin(String(message.email || '').trim(), String(message.senha || ''));
     if (tipo === 'nuvem-logout') { await nuvemLogout(); return { ok: true }; }
-    if (tipo === 'nuvem-sync') return nuvemSincronizar({ forcar: true });
+    if (tipo === 'nuvem-sync') { await nuvemPuxarConfig(); return nuvemSincronizar({ forcar: true }); }
     if (tipo === 'nuvem-abrir-painel') { await chrome.tabs.create({ url: NUVEM.painel }); return { ok: true }; }
     return { ok: false, erro: 'Ação desconhecida' };
   })().then(r => sendResponse(r || { ok: true }), e => sendResponse({ ok: false, erro: e.message }));

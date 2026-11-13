@@ -14,6 +14,15 @@
   };
 
   const parseOwnPrice = value => parsePrice(value);
+  // Nome(s) da loja para marcar "NOSSO" (configurável pelo admin no painel online).
+  const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const regexLoja = nomes => {
+    const partes = (nomes || []).map(n => semAcento(n).trim()).filter(Boolean)
+      .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*'));
+    return partes.length ? new RegExp(partes.join('|'), 'i') : /levanti\s*maquinas/i;
+  };
+  let lojaRegex = regexLoja();
+  let precoPadrao = null;
   const source = location.hostname.includes('mercadolivre') ? 'Mercado Livre'
     : location.hostname.includes('magazineluiza') ? 'Magalu'
     : location.hostname.includes('shopee') ? 'Shopee'
@@ -515,7 +524,7 @@
         freeShipping: /frete grátis|frete gratis|entrega grátis/.test(all),
         full: /\bfull\b/.test(all),
         international: /internacional|importado|china|exterior|overseas/.test(all),
-        ours: /levanti\s*máquinas|levanti\s*maquinas/.test(`${title} ${seller}`)
+        ours: lojaRegex.test(semAcento(`${title} ${seller}`))
       };
     }).filter(Boolean).slice(0, 100);
   }
@@ -615,6 +624,7 @@
       <div id="mr-results"></div>`;
 
     document.documentElement.append(root);
+    if (precoPadrao) root.querySelector('#mr-price').value = precoPadrao.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
     root.querySelector('#mr-close').onclick = () => root.remove();
     root.querySelector('#mr-refresh').onclick = refresh;
@@ -668,6 +678,7 @@
     handle.addEventListener('pointercancel', () => { active = false; });
   }
 
+  function iniciar() {
   mount();
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type === 'product-page-progress') {
@@ -695,4 +706,15 @@
     clearTimeout(timer);
     timer = setTimeout(() => { captureVisibleProductData(); refresh(); }, 1300);
   }).observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  // Configurações do admin (painel online): marketplaces desligados não mostram o radar.
+  chrome.storage.local.get('radarConfig', ({ radarConfig = {} }) => {
+    const nuvem = radarConfig.nuvem || {};
+    const ativos = nuvem.marketplacesAtivos || [];
+    if (ativos.length && !ativos.includes(source)) return;
+    lojaRegex = regexLoja(nuvem.nomesLoja);
+    precoPadrao = nuvem.precoPadrao || null;
+    iniciar();
+  });
 })();

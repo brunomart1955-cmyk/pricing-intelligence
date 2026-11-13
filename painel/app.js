@@ -20,7 +20,7 @@
 
   // ---------- Telas ----------
   function mostrar(tela) {
-    ['setup', 'auth', 'pendente', 'app', 'usuarios', 'assistente'].forEach(t => { $(`#view-${t}`).hidden = t !== tela; });
+    ['setup', 'auth', 'pendente', 'app', 'usuarios', 'assistente', 'configuracoes'].forEach(t => { $(`#view-${t}`).hidden = t !== tela; });
   }
   function msg(el, texto, tipo) { el.textContent = texto || ''; el.className = `msg ${tipo || ''}`; }
 
@@ -131,7 +131,10 @@
   // ---------- Filtros ----------
   function preencherFiltros() {
     const mSel = $('#f-market'), sSel = $('#f-snapshot');
-    const mAtual = mSel.value, sAtual = sSel.value;
+    // Na primeira carga, usa o marketplace padrão das preferências pessoais.
+    const mAtual = mSel.value || (filtrosIniciados ? '' : (window.SRConfig?.prefs?.marketplacePadrao || ''));
+    const sAtual = sSel.value;
+    filtrosIniciados = true;
     const canais = [...new Set(ofertas.map(o => o.marketplace))].sort();
     mSel.innerHTML = '<option value="">Todos</option>' + canais.map(c => `<option>${esc(c)}</option>`).join('');
     sSel.innerHTML = '<option value="">Todas</option>' + snapshots.slice().reverse()
@@ -140,6 +143,7 @@
     if (snapshots.some(s => String(s.id) === sAtual)) sSel.value = sAtual;
   }
 
+  let filtrosIniciados = false;
   function meuPreco() { return P.parsePreco($('#f-own').value); }
 
   function filtrar({ ignorarSnapshot = false } = {}) {
@@ -299,6 +303,7 @@
     });
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => snapshots.length && render());
+    window.addEventListener('sr-tema', () => snapshots.length && render());
   }
 
   // ---------- Login ----------
@@ -327,6 +332,7 @@
       $('#auth-submit').disabled = true;
       try {
         if (modoAuth === 'criar') {
+          if (window.SRConfig?.publico?.cadastroAberto === false) throw new Error('O cadastro de novas contas está fechado. Peça acesso ao administrador.');
           const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: redirect } });
           if (error) throw error;
           if (!data.session) msg($('#auth-msg'), 'Conta criada! Confirme pelo link enviado ao seu e-mail e depois entre.', 'ok');
@@ -386,7 +392,7 @@
       $('#pend-titulo').textContent = acesso.status === 'bloqueado' ? 'Acesso bloqueado' : 'Aguardando aprovação';
       $('#pend-texto').textContent = acesso.status === 'bloqueado'
         ? 'Sua conta foi bloqueada pelo administrador. Fale com ele para liberar o acesso.'
-        : 'Sua conta foi criada. Assim que o administrador aprovar, você poderá usar o painel e a extensão. Depois de aprovado, clique em "Verificar de novo".';
+        : (window.SRConfig?.publico?.mensagemEspera || 'Sua conta foi criada. Assim que o administrador aprovar, você poderá usar o painel e a extensão.') + ' Depois de aprovado, clique em "Verificar de novo".';
       mostrar('pendente');
       return;
     }
@@ -394,8 +400,10 @@
     $('#nav').hidden = false;
     $('#nav-admin').hidden = !acesso.admin;
     store = storeSupabase;
+    filtrosIniciados = false;
+    try { await window.SRConfig?.aoEntrar(acesso); } catch (e) { console.warn('Preferências não carregadas', e); }
     const destino = location.hash.slice(1);
-    irPara(destino === 'usuarios' && acesso.admin ? 'usuarios' : destino === 'assistente' ? 'assistente' : 'app');
+    irPara(destino === 'usuarios' && acesso.admin ? 'usuarios' : ['assistente', 'configuracoes'].includes(destino) ? destino : 'app');
     carregar();
   }
 
@@ -403,6 +411,7 @@
     document.querySelectorAll('#nav [data-ir]').forEach(a => a.classList.toggle('ativo', a.dataset.ir === tela));
     mostrar(tela);
     if (tela === 'usuarios') carregarUsuarios();
+    if (tela === 'configuracoes') window.SRConfig?.abrir();
   }
 
   const ROTULO_STATUS = { pendente: 'Pendente', aprovado: 'Aprovado', bloqueado: 'Bloqueado' };
@@ -481,7 +490,14 @@
   }
 
   // Usado pela aba Assistente (assistente.js).
-  window.SRApp = { sb, P, getOfertas: () => ofertas };
+  window.SRApp = {
+    sb, P,
+    getOfertas: () => ofertas,
+    getAcesso: () => acesso,
+    getUsuarioId: () => usuarioAtual,
+    recarregar: () => store && carregar(),
+    aplicarPrecoReferencia(valor) { $('#f-own').value = valor || ''; if (snapshots.length) render(); }
+  };
 
   // ---------- Início ----------
   ligarEventos();

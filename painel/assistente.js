@@ -99,6 +99,7 @@
           ? 'O assistente ainda não foi instalado no Supabase (Edge Function "assistente").' : error.message; }
       }
       conversa.push(erro ? { papel: 'assistente', texto: `⚠️ ${erro}`, erro: true } : { papel: 'assistente', texto: data.texto });
+      if (data?.uso?.usadas) $('#chat-uso').textContent = data.uso.limite ? `${data.uso.usadas} de ${data.uso.limite} perguntas hoje` : '';
     } catch (err) {
       conversa.push({ papel: 'assistente', texto: `⚠️ ${err.message}`, erro: true });
     } finally {

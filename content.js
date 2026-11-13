@@ -3,6 +3,15 @@
   const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
   let products = [];
   let currentSearch = '';
+  // Nome(s) da loja para marcar "NOSSO" (configurável pelo admin no painel online).
+  const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const regexLoja = nomes => {
+    const partes = (nomes || []).map(n => semAcento(n).trim()).filter(Boolean)
+      .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*'));
+    return partes.length ? new RegExp(partes.join('|'), 'i') : /levanti\s*maquinas/i;
+  };
+  let lojaRegex = regexLoja();
+  let precoPadrao = null;
 
   // O script também é registrado para /search porque o Google Shopping usa essa
   // rota. Não renderize o painel em resultados comuns do Google.
@@ -123,7 +132,7 @@
         freeShipping: /frete grátis|entrega grátis|envio grátis/.test(fullText),
         full: /\bfull\b/i.test(fullText),
         international: /internacional|importado|china|exterior|overseas/i.test(fullText),
-        ours: /levanti\s*máquinas|levanti\s*maquinas/i.test(store)
+        ours: lojaRegex.test(semAcento(store))
       });
     });
     // Limite de segurança: evita travamento do navegador ao abrir buscas enormes.
@@ -214,6 +223,7 @@
       <div class="sr-market"><span>Pesquisa: <b id="sr-query"></b></span><span>Média: <b id="sr-average"></b></span></div>
       <div id="sr-results" class="sr-results"></div>`;
     document.documentElement.append(root);
+    if (precoPadrao) root.querySelector('#sr-my-price').value = precoPadrao.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
     root.querySelector('#sr-close').onclick = () => root.remove();
     root.querySelector('#sr-refresh').onclick = refresh;
     root.querySelector('#sr-clear').onclick = () => { products = []; render(); chrome.storage.local.remove('shoppingRadarData'); };
@@ -260,6 +270,7 @@
 
   if (!isShoppingPage()) return;
 
+  function iniciar() {
   mount();
   let timer;
   new MutationObserver((records) => {
@@ -275,4 +286,15 @@
     clearTimeout(timer);
     timer = setTimeout(refresh, 900);
   }).observe(document.body, { childList: true, subtree: true });
+  }
+
+  // Configurações do admin (painel online): marketplaces desligados não mostram o radar.
+  chrome.storage.local.get('radarConfig', ({ radarConfig = {} }) => {
+    const nuvem = radarConfig.nuvem || {};
+    const ativos = nuvem.marketplacesAtivos || [];
+    if (ativos.length && !ativos.includes('Google Shopping')) return;
+    lojaRegex = regexLoja(nuvem.nomesLoja);
+    precoPadrao = nuvem.precoPadrao || null;
+    iniciar();
+  });
 })();

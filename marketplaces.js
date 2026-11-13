@@ -251,7 +251,15 @@ document.querySelector('#export-json-btn').addEventListener('click', () => {
 (() => {
   const box = document.querySelector('#leitura-completa');
   if (!box) return;
-  chrome.storage.local.get('radarConfig', ({ radarConfig = {} }) => { box.checked = Boolean(radarConfig.leituraCompleta); });
+  const aplicar = (radarConfig = {}) => {
+    const modoAdmin = radarConfig.nuvem?.modoLeitura;
+    const fixo = modoAdmin === 'rapida' || modoAdmin === 'completa';
+    box.checked = fixo ? modoAdmin === 'completa' : Boolean(radarConfig.leituraCompleta);
+    box.disabled = fixo;
+    box.closest('label')?.setAttribute('title', fixo ? 'Definido pelo administrador no painel online (Configurações).' : '');
+  };
+  chrome.storage.local.get('radarConfig', ({ radarConfig }) => aplicar(radarConfig));
+  chrome.storage.onChanged.addListener((mudou, area) => { if (area === 'local' && mudou.radarConfig) aplicar(mudou.radarConfig.newValue); });
   box.addEventListener('change', () => {
     chrome.storage.local.get('radarConfig', ({ radarConfig = {} }) => {
       chrome.storage.local.set({ radarConfig: { ...radarConfig, leituraCompleta: box.checked } });

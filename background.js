@@ -277,7 +277,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // numa janela minimizada separada — necessário só para dados que a página
     // monta via JavaScript (ex.: Shopee, data da avaliação mais antiga).
     const { radarConfig = {} } = await chrome.storage.local.get('radarConfig');
-    const completa = Boolean(radarConfig.leituraCompleta);
+    // O admin pode fixar o modo pelo painel; senão vale a escolha do usuário.
+    const modoAdmin = radarConfig.nuvem?.modoLeitura;
+    const completa = modoAdmin === 'completa' ? true : modoAdmin === 'rapida' ? false : Boolean(radarConfig.leituraCompleta);
     await runPool(entries, async product => {
       let pageData = completa ? await openPageAndRead(product.url) : await baixarPagina(product.url);
       // Download bloqueado pelo marketplace: lê esse anúncio pela janela minimizada.

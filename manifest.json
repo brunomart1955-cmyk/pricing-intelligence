@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Shopping Radar",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Painel de inteligência de preços com leitura local dos marketplaces e sincronização com o painel online.",
   "permissions": [
     "storage",

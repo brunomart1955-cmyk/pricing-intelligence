@@ -3,14 +3,16 @@
 // - A chave do Gemini fica SÓ aqui, como segredo do Supabase (GEMINI_API_KEY);
 //   nunca vai para o site nem para o GitHub.
 // - Só atende quem está logado E aprovado pelo admin (função sou_aprovado()).
-// - Modelo configurável pelo segredo GEMINI_MODEL (padrão abaixo).
+// - Ajustes vêm da aba Configurações (tabela "configuracoes", chave "assistente"):
+//   IA ligada/desligada, modelo, instruções da loja, temperatura e limite diário.
+//   Se a tabela não existir, usa o segredo GEMINI_MODEL / os padrões abaixo.
 //
 // Deploy pelo painel do Supabase: Edge Functions → Deploy a new function →
 // Via Editor → nome "assistente" → cole este arquivo → Deploy.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const MODELO_PADRAO = 'gemini-2.5-flash';
+const MODELO_PADRAO = 'gemini-3.8-flash';
 const MAX_MENSAGENS = 20;
 const MAX_TEXTO = 8000;
 const MAX_CONTEXTO = 60000;
@@ -45,6 +47,11 @@ Deno.serve(async (req) => {
     const { data: aprovado, error: erroAcesso } = await sb.rpc('sou_aprovado');
     if (erroAcesso || !aprovado) return json({ erro: 'Sua conta ainda não foi aprovada pelo administrador.' }, 403);
 
+    // Configurações definidas pelo admin no painel (opcional).
+    const { data: linhaCfg } = await sb.from('configuracoes').select('valor').eq('chave', 'assistente').maybeSingle();
+    const cfg = (linhaCfg?.valor ?? {}) as Record<string, any>;
+    if (cfg.ativo === false) return json({ erro: 'O assistente está desligado pelo administrador.' }, 403);
+
     const chave = Deno.env.get('GEMINI_API_KEY');
     if (!chave) return json({ erro: 'O administrador ainda não configurou a chave do Gemini (segredo GEMINI_API_KEY).' }, 500);
 
@@ -61,14 +68,29 @@ Deno.serve(async (req) => {
     }
     const contexto = typeof corpo.contexto === 'string' ? corpo.contexto.slice(0, MAX_CONTEXTO) : '';
 
-    let modelo = Deno.env.get('GEMINI_MODEL') || MODELO_PADRAO;
+    // Limite diário por usuário (conta a pergunta). Sem a função no banco, segue sem limite.
+    const { data: uso, error: erroUso } = await sb.rpc('registrar_pergunta');
+    if (!erroUso && uso && uso.ok === false) {
+      return json({ erro: `Você já fez as ${uso.limite} perguntas permitidas hoje. O limite renova amanhã.` }, 429);
+    }
+
+    const instrucoes = typeof cfg.instrucoes === 'string' ? cfg.instrucoes.trim().slice(0, 4000) : '';
+    const sistema = [
+      SISTEMA,
+      instrucoes && `INSTRUÇÕES DA LOJA (definidas pelo administrador):\n${instrucoes}`,
+      contexto && `DADOS:\n${contexto}`,
+    ].filter(Boolean).join('\n\n');
+    const temp = Number(cfg.temperatura);
+    const temperatura = Number.isFinite(temp) ? Math.min(1, Math.max(0, temp)) : 0.4;
+
+    let modelo = String(cfg.modelo || '').trim() || Deno.env.get('GEMINI_MODEL') || MODELO_PADRAO;
     const chamar = (m: string) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': chave },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: contexto ? `${SISTEMA}\n\nDADOS:\n${contexto}` : SISTEMA }] },
+        systemInstruction: { parts: [{ text: sistema }] },
         contents: mensagens,
-        generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
+        generationConfig: { temperature: temperatura, maxOutputTokens: 2048 },
       }),
     });
     const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -105,7 +127,7 @@ Deno.serve(async (req) => {
     }
     const texto = (dados?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? '').join('').trim();
     if (!texto) return json({ erro: 'O Gemini não retornou resposta (pode ter sido bloqueada por filtro de segurança).' }, 502);
-    return json({ texto, modelo });
+    return json({ texto, modelo, uso: erroUso ? null : uso });
   } catch (e) {
     return json({ erro: `Falha no assistente: ${(e as Error).message}` }, 500);
   }
