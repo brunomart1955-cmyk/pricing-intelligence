@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shopping Radar · Painel</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230f766e'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='white' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='white'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <div>
+        <strong>Shopping Radar</strong>
+        <small>Painel de inteligência de preços</small>
+      </div>
+    </div>
+    <div id="user-box" class="user-box" hidden>
+      <span id="user-email"></span>
+      <button id="logout-btn" class="ghost">Sair</button>
+    </div>
+  </header>
+
+  <!-- Configuração pendente -->
+  <section id="view-setup" class="center-card" hidden>
+    <h1>Falta conectar o banco de dados</h1>
+    <p>O painel usa o <b>Supabase</b> (gratuito) para login e para salvar os dados de cada usuário.</p>
+    <ol>
+      <li>Crie um projeto em <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a>.</li>
+      <li>Em <b>SQL Editor</b>, cole e rode o arquivo <code>supabase.sql</code> deste repositório.</li>
+      <li>Em <b>Project Settings → API</b>, copie a <b>Project URL</b> e a <b>anon public key</b> para o arquivo <code>config.js</code>.</li>
+    </ol>
+    <p class="muted">Enquanto isso, dá pra testar o painel sem login com dados de exemplo (nada é salvo).</p>
+    <button id="demo-btn" class="primary">Abrir modo demonstração</button>
+  </section>
+
+  <!-- Login -->
+  <section id="view-auth" class="center-card" hidden>
+    <h1 id="auth-title">Entrar</h1>
+    <form id="auth-form">
+      <label>E-mail<input id="auth-email" type="email" autocomplete="email" required></label>
+      <label>Senha<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required></label>
+      <button id="auth-submit" class="primary" type="submit">Entrar</button>
+    </form>
+    <p id="auth-msg" class="msg" role="status"></p>
+    <div class="auth-links">
+      <button id="auth-toggle" class="link">Não tem conta? Criar conta</button>
+      <button id="auth-forgot" class="link">Esqueci a senha</button>
+    </div>
+  </section>
+
+  <!-- Painel -->
+  <main id="view-app" hidden>
+    <div id="demo-banner" class="banner" hidden>Modo demonstração: os dados não são salvos. Configure o Supabase para ter login e histórico.</div>
+
+    <section class="toolbar">
+      <label class="drop" id="drop-zone">
+        <input id="file-input" type="file" accept=".json,application/json" multiple hidden>
+        <span class="drop-icon" aria-hidden="true">⬆</span>
+        <span><b>Importar JSON da extensão</b><br><small>Arraste o arquivo aqui ou clique para escolher</small></span>
+      </label>
+      <div class="filters">
+        <label>Buscar<input id="f-text" type="search" placeholder="Produto ou vendedor"></label>
+        <label>Marketplace<select id="f-market"><option value="">Todos</option></select></label>
+        <label>Importação<select id="f-snapshot"><option value="">Todas</option></select></label>
+        <label>Seu preço<input id="f-own" inputmode="decimal" placeholder="Ex.: 952,00"></label>
+      </div>
+    </section>
+    <p id="app-msg" class="msg" role="status"></p>
+
+    <section class="kpis">
+      <article><small>Ofertas</small><strong id="k-total">—</strong><span id="k-total-sub"></span></article>
+      <article><small>Menor preço</small><strong id="k-min">—</strong><span id="k-min-sub"></span></article>
+      <article><small>Preço médio</small><strong id="k-avg">—</strong><span id="k-avg-sub"></span></article>
+      <article><small>Abaixo do seu preço</small><strong id="k-below">—</strong><span id="k-below-sub"></span></article>
+    </section>
+
+    <section class="grid-2">
+      <article class="panel">
+        <h2>Preço por marketplace</h2>
+        <p class="muted">Menor e médio de cada canal</p>
+        <div class="chart-box"><canvas id="c-market"></canvas></div>
+      </article>
+      <article class="panel">
+        <h2>Histórico de preços</h2>
+        <p class="muted">Menor e médio em cada importação</p>
+        <div class="chart-box"><canvas id="c-history"></canvas></div>
+      </article>
+    </section>
+
+    <section class="grid-2">
+      <article class="panel">
+        <h2>Vendedores com mais ofertas</h2>
+        <div id="sellers" class="rank"></div>
+      </article>
+      <article class="panel">
+        <h2>Importações salvas</h2>
+        <div id="snapshots" class="snap-list"></div>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Ofertas <small id="table-count" class="muted"></small></h2>
+        <div class="actions">
+          <button id="export-csv" class="ghost">⬇ CSV</button>
+          <button id="export-json" class="ghost">⬇ JSON</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th data-sort="name">Produto</th>
+            <th data-sort="price" class="num">Preço</th>
+            <th data-sort="marketplace">Canal</th>
+            <th data-sort="seller">Vendedor</th>
+            <th data-sort="sales" class="num">Vendas</th>
+            <th data-sort="date">Importado</th>
+          </tr></thead>
+          <tbody id="offers"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="config.js"></script>
+  <script src="processamento.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

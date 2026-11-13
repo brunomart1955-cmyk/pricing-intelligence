@@ -55,4 +55,4 @@ Esses dois foram adicionados com a mesma lógica dos demais, mas com uma ressalv
 
 ## Exportar JSON e painel web
 
-No dashboard de Marketplaces, o botão **⬇ Exportar JSON** baixa um arquivo com todos os dados coletados (Google Shopping + marketplaces). Esse arquivo pode ser importado no painel web [shopping-radar-painel](https://github.com/brunomart1955-cmyk/shopping-radar-painel), que tem login, salva o histórico de cada usuário e mostra gráficos. A extensão em si continua sem login e sem credenciais.
+No dashboard de Marketplaces, o botão **⬇ Exportar JSON** baixa um arquivo com todos os dados coletados (Google Shopping + marketplaces). Esse arquivo pode ser importado no painel web [painel](painel/) — no ar em https://brunomart1955-cmyk.github.io/pricing-intelligence/painel/, que tem login, salva o histórico de cada usuário e mostra gráficos. A extensão em si continua sem login e sem credenciais.
