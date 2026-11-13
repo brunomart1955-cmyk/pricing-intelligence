@@ -1,0 +1,3165 @@
+<!doctype html><html><head>
+<!-- Acesso protegido: login aprovado + dados no Supabase (painel/magalu/acesso.js) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../config.js"></script>
+<script src="acesso.js"></script><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Magalu Sales Intelligence</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   LAYOUT CONCEPT: sala de controle comercial (cyberpunk terminal) —
+   barra de comando fixa no topo com abas ("Painel" / "Gráfico
+   Interativo"), abaixo um grid: KPIs -> visão geral -> quadro de
+   oportunidades (3 raias) -> explorador de SKUs, ou a aba de análise
+   técnica multi-indicador com velas semanais/mensais.
+   PALETA: base clara com leve tom frio (cyberpunk "diurno") e trio
+   neon ciano/magenta/violeta validado pro dataviz skill (CVD-safe);
+   modo escuro vira o terminal cyberpunk clássico. Cores de status
+   (bom/alerta/crítico) permanecem fixas por semântica.
+   ============================================================ */
+:root{
+  --bg:#f3f7f9; --surface:#ffffff; --surface-2:#e9f1f4; --border:#d3e3e8;
+  --text-primary:#0a1519; --text-secondary:#28434c; --text-muted:#5c7580;
+  --accent:#0aa8c2; --accent-soft:#e0f6fa;
+  --series-2:#eb6834; --series-3:#c81fa0; --series-4:#7c4fe0;
+  --good:#0ca30c; --good-soft:#e5f6e3; --warning:#c47f00; --warning-soft:#fdf1da;
+  --serious:#ec835a; --serious-soft:#fdeae1; --critical:#d03b3b; --critical-soft:#fbe6e6;
+  --font-display:'Rajdhani',system-ui,sans-serif; --font-body:'IBM Plex Sans',system-ui,sans-serif; --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+  --glow:0 0 0 rgba(0,0,0,0);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#07080d; --surface:#0f121a; --surface-2:#171b26; --border:#232a3a;
+    --text-primary:#f5fdff; --text-secondary:#bccedb; --text-muted:#7c90a2;
+    --accent:#17a6bd; --accent-soft:#0d2e36;
+    --series-2:#d95926; --series-3:#c026a3; --series-4:#8b5cf6;
+    --good:#3fc23f; --good-soft:#173318; --warning:#e0a324; --warning-soft:#3a2d0c;
+    --serious:#f0956e; --serious-soft:#3a2115; --critical:#e66767; --critical-soft:#3a1717;
+    --glow:0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#07080d; --surface:#0f121a; --surface-2:#171b26; --border:#232a3a;
+  --text-primary:#f5fdff; --text-secondary:#bccedb; --text-muted:#7c90a2;
+  --accent:#17a6bd; --accent-soft:#0d2e36;
+  --series-2:#d95926; --series-3:#c026a3; --series-4:#8b5cf6;
+  --good:#3fc23f; --good-soft:#173318; --warning:#e0a324; --warning-soft:#3a2d0c;
+  --serious:#f0956e; --serious-soft:#3a2115; --critical:#e66767; --critical-soft:#3a1717;
+  --glow:0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+  color-scheme:dark;
+}
+/* ---- paletas extras (escolha manual, guardada por navegador — não é o
+   claro/escuro automático do visualizador de artifacts acima, por isso
+   fica num atributo próprio [data-palette] em vez de reusar [data-theme]).
+   Texto sempre com contraste alto contra o fundo de cada paleta (primário
+   quase branco/quase preto, secundário e muted ainda claramente legíveis,
+   não só decorativos). ---- */
+:root[data-palette="hacker"]{
+  /* terminal clássico: fundo PRETO de verdade, texto verde vivo. O "verde"
+     não é mais usado como accent (botões/abas ativas) pra não competir com
+     o texto — accent vira ciano, que é a "cor base" que ficou livre pra
+     escolher. */
+  --bg:#000000; --surface:#0a0f0a; --surface-2:#10180f; --border:#1d3a1d;
+  --text-primary:#39ff14; --text-secondary:#2fe655; --text-muted:#22a83f;
+  --accent:#00e5ff; --accent-soft:#032a30;
+  --series-2:#ffcc00; --series-3:#ff2fa0; --series-4:#7cffb2;
+  --good:#39ff14; --good-soft:#062b12; --warning:#ffd23f; --warning-soft:#3a2f06;
+  --serious:#ff8c42; --serious-soft:#3a1f08; --critical:#ff3b3b; --critical-soft:#3a0d0d;
+  --font-display:'IBM Plex Mono',ui-monospace,monospace; --font-body:'IBM Plex Mono',ui-monospace,monospace;
+  --glow:0 0 18px color-mix(in srgb, var(--accent) 70%, transparent);
+  color-scheme:dark;
+}
+:root[data-palette="synthwave"]{
+  --bg:#0c0221; --surface:#170b34; --surface-2:#221246; --border:#3d1f66;
+  --text-primary:#fdf6ff; --text-secondary:#dcbcff; --text-muted:#a488cc;
+  --accent:#ff2ec4; --accent-soft:#3a0f2e;
+  --series-2:#00e5ff; --series-3:#ffdf00; --series-4:#7c4fe0;
+  --good:#05e0a4; --good-soft:#062a24; --warning:#ffcc00; --warning-soft:#3a2f06;
+  --serious:#ff8a3d; --serious-soft:#3a1f08; --critical:#ff3d6e; --critical-soft:#3a0d1c;
+  --glow:0 0 18px color-mix(in srgb, var(--accent) 60%, transparent);
+  color-scheme:dark;
+}
+:root[data-palette="amber"]{
+  --bg:#0a0704; --surface:#171006; --surface-2:#22170a; --border:#4a3413;
+  --text-primary:#ffe2b3; --text-secondary:#eab868; --text-muted:#b08a48;
+  --accent:#ffb100; --accent-soft:#332000;
+  --series-2:#ff7a3d; --series-3:#ffe066; --series-4:#ff9a3d;
+  --good:#8fd400; --good-soft:#293300; --warning:#ffcc00; --warning-soft:#332800;
+  --serious:#ff8a3d; --serious-soft:#3a1f08; --critical:#ff4d3d; --critical-soft:#3a0f0d;
+  --font-display:'IBM Plex Mono',ui-monospace,monospace; --font-body:'IBM Plex Mono',ui-monospace,monospace;
+  --glow:0 0 18px color-mix(in srgb, var(--accent) 65%, transparent);
+  color-scheme:dark;
+}
+:root[data-palette="levanti"]{
+  /* paleta em homenagem à empresa (Levanti Máquinas): azul-marinho + amarelo */
+  --bg:#050b1a; --surface:#0a1530; --surface-2:#0f1d40; --border:#1f3a70;
+  --text-primary:#fdfbf2; --text-secondary:#d8e0f5; --text-muted:#8b9fc9;
+  --accent:#ffcc00; --accent-soft:#3a2f04;
+  --series-2:#ff6b35; --series-3:#4fd6ff; --series-4:#ffe070;
+  --good:#3fd67a; --good-soft:#0c2a1a; --warning:#ffcc00; --warning-soft:#3a2f04;
+  --serious:#ff9145; --serious-soft:#3a2007; --critical:#ff5c5c; --critical-soft:#3a1010;
+  --glow:0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+  color-scheme:dark;
+}
+:root[data-palette="ocean"]{
+  --bg:#020d14; --surface:#052030; --surface-2:#083044; --border:#155b79;
+  --text-primary:#f0fdff; --text-secondary:#bfeaf7; --text-muted:#78b4c9;
+  --accent:#00c2ff; --accent-soft:#052936;
+  --series-2:#3ce6b0; --series-3:#ffd166; --series-4:#8b7dff;
+  --good:#3ce6b0; --good-soft:#0a2e24; --warning:#ffd166; --warning-soft:#3a2f0c;
+  --serious:#ff9a6b; --serious-soft:#3a1f10; --critical:#ff5c72; --critical-soft:#3a0f18;
+  --glow:0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+  color-scheme:dark;
+}
+:root[data-palette="forest"]{
+  --bg:#0a120a; --surface:#121e12; --surface-2:#1a2a18; --border:#355c30;
+  --text-primary:#f4fbee; --text-secondary:#cfe8c0; --text-muted:#8fb67e;
+  --accent:#7dc242; --accent-soft:#1c2e14;
+  --series-2:#d9a441; --series-3:#4fb0a6; --series-4:#c97b4a;
+  --good:#7dc242; --good-soft:#1c2e14; --warning:#d9a441; --warning-soft:#2e2308;
+  --serious:#c97b4a; --serious-soft:#2e1a0d; --critical:#d1543f; --critical-soft:#2e1310;
+  --glow:0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+  color-scheme:dark;
+}
+:root[data-palette="sunset"]{
+  --bg:#160a12; --surface:#241221; --surface-2:#301a2c; --border:#5c3453;
+  --text-primary:#fff5f9; --text-secondary:#f4cbe0; --text-muted:#c188aa;
+  --accent:#ff5f7e; --accent-soft:#3a1420;
+  --series-2:#ffb347; --series-3:#ffe066; --series-4:#c77dff;
+  --good:#5fd98a; --good-soft:#123a22; --warning:#ffb347; --warning-soft:#3a2508;
+  --serious:#ff8659; --serious-soft:#3a1c0e; --critical:#ff4f6d; --critical-soft:#3a1018;
+  --glow:0 0 16px color-mix(in srgb, var(--accent) 55%, transparent);
+  color-scheme:dark;
+}
+:root[data-palette="slate"]{
+  --bg:#101216; --surface:#181b21; --surface-2:#20242c; --border:#3d4452;
+  --text-primary:#f7f9fc; --text-secondary:#d2d8e4; --text-muted:#909aac;
+  --accent:#5b8def; --accent-soft:#16233f;
+  --series-2:#7ee0c3; --series-3:#e0b85b; --series-4:#c98be0;
+  --good:#5fd98a; --good-soft:#123a22; --warning:#e0b85b; --warning-soft:#3a2d08;
+  --serious:#e0925b; --serious-soft:#3a1f0d; --critical:#e0605b; --critical-soft:#3a1310;
+  --glow:0 0 16px color-mix(in srgb, var(--accent) 45%, transparent);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text-primary);font-family:var(--font-body);font-size:14px;line-height:1.45;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px);
+  background-size:34px 34px; background-attachment:fixed;
+}
+#bg-layer{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center center;background-repeat:no-repeat;background-attachment:fixed;opacity:0}
+#bg-layer.active{opacity:1}
+#bg-scrim{position:fixed;inset:0;z-index:-1;background:var(--bg);opacity:1;transition:opacity .2s}
+#bg-scrim.dimmed{opacity:.82}
+.wrap{max-width:1760px;margin:0 auto;padding:0 24px 64px;transition:opacity .18s ease}
+/* ---- modo "ver fundo": recolhe todos os painéis/dashboards de uma vez, pra
+   olhar/vislumbrar a imagem de fundo sem nada sobreposto. A topbar some do
+   jeito visível (fica só uma faixa fina translúcida) mas continua clicável,
+   com o próprio botão, pra voltar. ---- */
+body.bg-focus-mode .wrap{display:none}
+body.bg-focus-mode #bg-scrim.dimmed{opacity:.12}
+body.bg-focus-mode .topbar{background:color-mix(in srgb, var(--surface) 38%, transparent);border-bottom-color:color-mix(in srgb, var(--accent) 45%, transparent)}
+body.bg-focus-mode .topbar-inner>*:not(#bg-focus-btn):not(.brand){opacity:.35;transition:opacity .15s}
+body.bg-focus-mode .topbar-inner:hover>*{opacity:1}
+body.bg-focus-mode .brand{opacity:.6}
+h1,h2,h3{font-family:var(--font-display);font-weight:700;margin:0;text-wrap:balance}
+.tabular{font-variant-numeric:tabular-nums}
+a{color:inherit}
+button{font-family:inherit}
+
+/* topbar */
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb, var(--surface) 92%, transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--accent)}
+.main-tabs{display:flex;gap:4px;background:var(--surface-2);border-radius:9px;padding:3px}
+.main-tabs button{border:0;background:transparent;padding:7px 14px;border-radius:7px;font-family:var(--font-display);font-weight:700;font-size:13px;letter-spacing:.3px;color:var(--text-secondary);cursor:pointer}
+.main-tabs button.active{background:var(--accent);color:#02181c}
+.topbar-inner{max-width:1760px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;gap:1px;margin-right:auto}
+.brand .kicker{font-size:10px;letter-spacing:1.4px;font-weight:700;color:var(--accent);text-transform:uppercase}
+.brand h1{font-size:21px;letter-spacing:.3px;text-shadow:var(--glow)}
+.topbar-meta{font-size:11px;color:var(--text-muted)}
+.icon-btn{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:9px;padding:9px 12px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.icon-btn:hover{border-color:var(--accent)}
+.theme-select{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:9px;padding:9px 10px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer}
+.theme-select:hover{border-color:var(--accent)}
+#bg-file{display:none}
+
+/* sections */
+section{margin-top:28px}
+.section-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.section-head h2{font-size:16px}
+.section-note{font-size:11.5px;color:var(--text-muted);max-width:520px}
+
+/* KPI strip */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi small{color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.kpi strong{display:block;font-family:var(--font-display);font-weight:700;font-size:23px;margin-top:6px}
+.kpi .delta{font-size:11.5px;font-weight:600;margin-top:4px;display:inline-block}
+.delta.up{color:var(--good)} .delta.down{color:var(--critical)} .delta.flat{color:var(--text-muted)}
+
+/* two-col overview */
+.overview-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
+@media(max-width:760px){.overview-grid{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;min-width:0}
+.range-tabs{display:flex;gap:4px;background:var(--surface-2);border-radius:8px;padding:3px}
+.range-tabs button{border:0;background:transparent;padding:5px 10px;border-radius:6px;font-size:11.5px;font-weight:600;color:var(--text-secondary);cursor:pointer}
+.range-tabs button.active{background:var(--surface);color:var(--text-primary);box-shadow:0 1px 2px #0002}
+.store-bar-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px}
+.store-bar-row .name{width:150px;flex:none;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.store-bar-track{flex:1;height:9px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+.store-bar-fill{height:100%;background:var(--accent);border-radius:5px}
+.store-bar-val{width:76px;flex:none;text-align:right;color:var(--text-muted);font-size:11px}
+.geo-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.geo-grid{grid-template-columns:1fr}}
+.city-rank{width:20px;flex:none;color:var(--text-muted);font-variant-numeric:tabular-nums;font-size:11px}
+
+/* indicator selector */
+.indicator-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip-toggle{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-secondary)}
+.chip-toggle.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);box-shadow:var(--glow)}
+.chip-toggle:disabled{opacity:.4;cursor:not-allowed}
+
+/* chips de seleção (comparativo de Marketing) — cor por item, mesma cor da
+   linha dele no gráfico; fundo neutro + contorno/texto coloridos em vez de
+   fundo sólido, pra garantir contraste em qualquer paleta de tema. */
+.chip-row{display:flex;gap:8px;flex-wrap:wrap;min-height:30px}
+.sel-chip{display:inline-flex;align-items:center;gap:7px;padding:5px 6px 5px 11px;border-radius:20px;font-size:12px;font-weight:700;background:var(--surface-2);border:1.5px solid var(--c);color:var(--c)}
+.sel-chip .dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.sel-chip button{border:0;background:transparent;color:var(--c);border-radius:50%;width:18px;height:18px;cursor:pointer;font-size:13px;line-height:1;display:inline-flex;align-items:center;justify-content:center;opacity:.75}
+.sel-chip button:hover{opacity:1;background:color-mix(in srgb, var(--c) 20%, transparent)}
+.chip-row-empty{font-size:12px;color:var(--text-muted);padding:6px 2px}
+
+/* opportunity board */
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+@media(max-width:860px){.board{grid-template-columns:1fr}}
+.lane{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px;min-width:0}
+.lane-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.lane-head h3{font-size:12.5px;text-transform:uppercase;letter-spacing:.5px}
+.lane-count{margin-left:auto;font-size:11px;color:var(--text-muted)}
+.lane-body{max-height:360px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
+.lane-body::-webkit-scrollbar{width:6px}
+.lane-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.op-item{padding:9px 8px;border-radius:9px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.op-item:hover{background:var(--surface-2)}
+.op-item .nm{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}
+.op-item .sub{font-size:10.5px;color:var(--text-muted)}
+.op-item .val{font-size:12px;font-weight:700;flex:none}
+.op-empty{font-size:11.5px;color:var(--text-muted);padding:8px}
+
+/* flags */
+.flags-tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:20px;background:var(--critical);color:#fff;font-size:10px;font-weight:800;margin-left:2px}
+.flag-btn{border:1px solid transparent;background:transparent;border-radius:7px;width:28px;height:28px;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;opacity:.55}
+.flag-btn:hover{opacity:1;background:var(--surface-2)}
+.flag-btn.flag-set{opacity:1;border-color:var(--border);background:var(--surface-2)}
+#flag-popover{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;width:260px;box-shadow:0 12px 30px #0004;display:none}
+#flag-popover.open{display:block}
+#flag-popover h4{font-size:12.5px;margin:0 0 8px;font-family:var(--font-display)}
+#flag-popover .fp-name{font-size:11px;color:var(--text-muted);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#flag-popover select,#flag-popover input{width:100%;border:1px solid var(--border);background:var(--bg);color:var(--text-primary);border-radius:8px;padding:7px 9px;font-size:12.5px;font-family:inherit;margin-bottom:8px}
+#flag-popover .fp-actions{display:flex;gap:6px;justify-content:space-between}
+#flag-popover .fp-actions button{flex:1;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);border-radius:8px;padding:7px 8px;font-size:11.5px;font-weight:700;cursor:pointer}
+#flag-popover .fp-save{background:var(--accent)!important;color:#02181c!important;border-color:var(--accent)!important}
+#flag-popover .fp-remove{color:var(--critical)!important}
+.flag-card{padding:10px 9px;border-radius:9px;border:1px solid var(--border);margin-bottom:8px}
+.flag-card .nm{font-size:12px;font-weight:600;cursor:pointer}
+.flag-card .nm:hover{color:var(--accent)}
+.flag-card .code{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-bottom:5px}
+.flag-card .act{font-size:11.5px;color:var(--text-secondary);margin-bottom:5px}
+.flag-card .meta{font-size:10px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;gap:6px}
+.flag-card .meta button{border:0;background:none;color:var(--accent);cursor:pointer;font-size:10.5px;font-weight:700;padding:0}
+
+/* filters */
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.filters input[type=search],.filters select{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:8px;padding:8px 10px;font-size:12.5px;font-family:inherit}
+.filters input[type=search]{flex:1;min-width:180px}
+.toggle-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;cursor:pointer;user-select:none}
+.toggle-pill input{accent-color:var(--accent)}
+
+/* table */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:820px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);font-size:12.5px}
+th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);font-weight:700;cursor:pointer;white-space:nowrap}
+th.active{color:var(--accent)}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--surface-2)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.sku-name{font-weight:600}
+.sku-code{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted)}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:700}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.critical{background:var(--critical-soft);color:var(--critical)}
+.badge.neutral{background:var(--surface-2);color:var(--text-secondary)}
+.spark-cell{width:96px}
+.pager{display:flex;justify-content:center;align-items:center;gap:10px;padding:14px;font-size:12px;color:var(--text-secondary)}
+.pager button{border:1px solid var(--border);background:var(--surface);border-radius:7px;padding:5px 10px;cursor:pointer;color:var(--text-primary)}
+.pager button:disabled{opacity:.35;cursor:default}
+
+/* detail drawer */
+#scrim{position:fixed;inset:0;background:#0008;z-index:40;opacity:0;pointer-events:none;transition:opacity .18s}
+#scrim.open{opacity:1;pointer-events:auto}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--surface);z-index:41;box-shadow:-12px 0 30px #0004;transform:translateX(100%);transition:transform .22s ease;overflow-y:auto;padding:20px env(safe-area-inset-top,0) calc(20px + env(safe-area-inset-bottom,0px))}
+#drawer.open{transform:translateX(0)}
+#drawer .dh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px}
+#drawer h2{font-size:17px}
+#drawer .close{border:0;background:var(--surface-2);border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer;flex:none}
+.drawer-tags{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.tag{font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:20px;display:inline-flex;align-items:center;gap:5px}
+.tag.good{background:var(--good-soft);color:var(--good)}
+.tag.warning{background:var(--warning-soft);color:var(--warning)}
+.tag.serious{background:var(--serious-soft);color:var(--serious)}
+.tag.critical{background:var(--critical-soft);color:var(--critical)}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
+.stat-row div{background:var(--surface-2);border-radius:10px;padding:9px 10px}
+.stat-row small{display:block;color:var(--text-muted);font-size:10px;text-transform:uppercase}
+.stat-row strong{font-family:var(--font-display);font-weight:700;font-size:15px}
+.drawer-section{margin-top:18px}
+.drawer-section h3{font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);margin-bottom:8px}
+.store-mini{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border)}
+.proj-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.proj-grid div{text-align:center;background:var(--surface-2);border-radius:9px;padding:8px 4px}
+.proj-grid small{color:var(--text-muted);font-size:10px}
+.proj-grid strong{display:block;font-family:var(--font-display);font-weight:700;font-size:14px;margin-top:2px}
+
+/* methodology */
+details.methodology{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px}
+details.methodology summary{cursor:pointer;font-weight:700;font-family:var(--font-display);font-size:13.5px}
+.methodology ul{margin:10px 0 0;padding-left:18px;color:var(--text-secondary);font-size:12.5px;line-height:1.6}
+.methodology li{margin-bottom:4px}
+
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-muted)}
+svg text{fill:var(--text-secondary);font-family:var(--font-body)}
+.crosshair-line{stroke:var(--text-muted);stroke-width:1;stroke-dasharray:3 3}
+.chart-tooltip{position:absolute;background:var(--text-primary);color:var(--bg);font-size:11px;padding:6px 9px;border-radius:7px;pointer-events:none;white-space:nowrap;transform:translate(-50%,-115%);z-index:5}
+.chart-legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.legend-item{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-secondary)}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex:none}
+
+/* carrossel (estoque / calendário) */
+.carousel{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:4px 2px 12px;scrollbar-width:thin}
+.carousel::-webkit-scrollbar{height:7px}
+.carousel::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.stock-card{scroll-snap-align:start;flex:0 0 220px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:13px 14px;cursor:pointer}
+.stock-card:hover{border-color:var(--accent)}
+.stock-card .nm{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px}
+.stock-card .sub{font-size:10.5px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:10px}
+.stock-card .qty-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.stock-card .qty-row strong{font-family:var(--font-display);font-size:19px}
+.stock-card .qty-row small{color:var(--text-muted);font-size:10px;text-transform:uppercase}
+.stock-empty{padding:24px;color:var(--text-muted);font-size:12.5px}
+.day-card{scroll-snap-align:start;flex:0 0 74px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 4px;text-align:center;cursor:pointer}
+.day-card .dow{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px}
+.day-card .dnum{font-family:var(--font-display);font-weight:700;font-size:20px;margin:4px 0 2px}
+.day-card .mon{font-size:10px;color:var(--text-muted)}
+.day-card.active{background:var(--accent-soft);border-color:var(--accent);box-shadow:var(--glow)}
+.day-card.active .dow,.day-card.active .mon{color:var(--accent)}
+.calendar-item{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid var(--border);font-size:12.5px}
+.calendar-item:last-child{border-bottom:0}
+.calendar-item .rank{width:22px;flex:none;color:var(--text-muted);font-size:11px}
+</style>
+
+<script>
+// aplica a paleta salva o quanto antes, pra não piscar o tema padrão
+// primeiro (evita FOUC) — leitura isolada em try/catch porque localStorage
+// pode falhar (aba anônima, storage bloqueado) e a página tem que
+// continuar funcionando normalmente mesmo assim.
+(function(){
+  try{
+    var saved = localStorage.getItem("msi-palette");
+    if(saved) document.documentElement.setAttribute("data-palette", saved);
+  }catch(e){}
+})();
+</script>
+
+<div id="bg-scrim"></div>
+<div id="bg-layer"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="kicker">Levanti Máquinas</span>
+      <h1>Magalu Sales Intelligence</h1>
+    </div>
+    <div class="main-tabs" id="main-tabs">
+      <button data-tab="painel" class="active">Painel</button>
+      <button data-tab="grafico">Gráfico Interativo</button>
+      <button data-tab="estoque">Estoque</button>
+      <button data-tab="calendario">Calendário</button>
+      <button data-tab="marketing">Marketing</button>
+      <button data-tab="flags">🚩 Flags <span id="flags-tab-count" class="flags-tab-badge" hidden></span></button>
+      <button data-tab="atualizar">Atualizar Dados</button>
+    </div>
+    <span class="topbar-meta" id="data-through-label">carregando dados…</span>
+    <select class="theme-select" id="theme-select" title="Tema de cores">
+      <option value="">🎨 Padrão (claro/escuro automático)</option>
+      <option value="hacker">🟢 Hacker Terminal</option>
+      <option value="synthwave">🟣 Synthwave</option>
+      <option value="amber">🟠 Âmbar retrô</option>
+      <option value="levanti">🔵 Levanti (azul-marinho e amarelo)</option>
+      <option value="ocean">🌊 Ocean</option>
+      <option value="forest">🌲 Forest</option>
+      <option value="sunset">🌅 Sunset</option>
+      <option value="slate">⚪ Slate</option>
+    </select>
+    <button class="icon-btn" id="bg-upload-btn">🖼 Fundo</button>
+    <button class="icon-btn" id="bg-reset-btn" hidden>✕ Remover fundo</button>
+    <input type="file" id="bg-file" accept="image/*">
+    <button class="icon-btn" id="bg-focus-btn" title="Recolhe os painéis pra ver o fundo inteiro">🗕 Recolher painéis</button>
+  </div>
+</div>
+
+<div class="wrap">
+<div id="tab-painel">
+
+  <section id="kpi-section">
+    <div class="section-head">
+      <h2>Resumo</h2>
+      <div class="range-tabs" id="kpi-range-tabs">
+        <button data-range="7">7d</button>
+        <button data-range="30" class="active">30d</button>
+        <button data-range="90">90d</button>
+        <button data-range="180">180d</button>
+      </div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section>
+    <div class="overview-grid">
+      <div class="card">
+        <div class="section-head">
+          <h2>Faturamento diário — todos os canais</h2>
+          <div class="range-tabs" id="range-tabs">
+            <button data-range="1">1D</button>
+            <button data-range="7">7D</button>
+            <button data-range="30">30d</button>
+            <button data-range="90">90d</button>
+            <button data-range="180" class="active">180d</button>
+            <button data-range="365">1a</button>
+            <button data-range="all">tudo</button>
+          </div>
+        </div>
+        <div id="overview-chart" style="position:relative"></div>
+      </div>
+      <div class="card">
+        <div class="section-head"><h2>Por marketplace</h2></div>
+        <div id="store-bars"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="geo-section">
+    <div class="section-head">
+      <h2>Geografia, marca &amp; canal</h2>
+      <span class="section-note" id="geo-coverage-note">Dados novos a partir do relatório mais recente — pedidos de importações antigas sem essas colunas não entram nesses totais.</span>
+    </div>
+    <div class="kpis" id="geo-kpis" style="margin-bottom:14px"></div>
+    <div class="geo-grid">
+      <div class="card">
+        <div class="section-head"><h2>Faturamento por estado (UF)</h2></div>
+        <div id="geo-uf-bars"></div>
+      </div>
+      <div class="card">
+        <div class="section-head"><h2>Top 15 cidades</h2></div>
+        <div class="table-wrap"><table style="font-size:12px" id="geo-city-table"></table></div>
+      </div>
+      <div class="card">
+        <div class="section-head"><h2>Faturamento por marca</h2></div>
+        <div id="geo-marca-bars"></div>
+      </div>
+      <div class="card">
+        <div class="section-head"><h2>Faturamento por canal de venda</h2></div>
+        <div id="geo-canal-bars"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Quadro de oportunidades comerciais</h2>
+      <span class="section-note">Sinais baseados só em quantidade e faturamento históricos — sem margem, comissão ou preço de concorrente nesta planilha. Não são recomendações automáticas de preço. O filtro de loja considera qualquer SKU que venda nesse marketplace (não só onde ele é o principal).</span>
+    </div>
+    <div class="section-head" style="margin-top:2px">
+      <span class="section-note">Mês de referência:</span>
+      <div class="range-tabs" id="board-month-tabs"></div>
+    </div>
+    <div class="section-note" id="board-month-hint" style="margin-bottom:8px"></div>
+    <div class="filters" style="margin-bottom:10px">
+      <select id="board-store-filter"><option value="">Todos os marketplaces</option></select>
+      <label class="section-note" style="display:inline-flex;align-items:center;gap:4px">De <input type="date" id="board-date-from" style="border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit"></label>
+      <label class="section-note" style="display:inline-flex;align-items:center;gap:4px">até <input type="date" id="board-date-to" style="border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit"></label>
+      <span class="section-note" style="margin-right:auto">(filtra pela data da última venda de cada SKU)</span>
+      <button class="icon-btn" id="board-export-btn">⭳ Exportar CSV</button>
+    </div>
+    <div class="board">
+      <div class="lane">
+        <div class="lane-head"><span class="dot" style="background:var(--good)"></span><h3>Acelerando</h3><span class="lane-count" id="count-accel"></span></div>
+        <div id="lane-accel" class="lane-body"></div>
+      </div>
+      <div class="lane">
+        <div class="lane-head"><span class="dot" style="background:var(--critical)"></span><h3>Desacelerando</h3><span class="lane-count" id="count-decel"></span></div>
+        <div id="lane-decel" class="lane-body"></div>
+      </div>
+      <div class="lane">
+        <div class="lane-head"><span class="dot" style="background:var(--warning)"></span><h3>Parado há 30d+</h3><span class="lane-count" id="count-stale"></span></div>
+        <div id="lane-stale" class="lane-body"></div>
+      </div>
+      <div class="lane">
+        <div class="lane-head"><span class="dot" style="background:var(--serious)"></span><h3>Parados com estoque</h3><span class="lane-count" id="count-stale-stock"></span></div>
+        <div id="lane-stale-stock" class="lane-body"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Explorador de SKUs</h2>
+      <div class="indicator-row" id="indicator-row">
+        <span class="section-note" style="margin-right:2px">Indicador no detalhe:</span>
+        <button class="chip-toggle active" data-ind="SMA">SMA</button>
+        <button class="chip-toggle" data-ind="RSI">RSI</button>
+        <button class="chip-toggle" data-ind="MACD">MACD</button>
+      </div>
+    </div>
+    <div class="filters">
+      <input type="search" id="search-input" placeholder="Buscar por nome ou SKU…">
+      <select id="store-filter"><option value="">Todos os marketplaces</option></select>
+      <div class="range-tabs" id="explorer-period-tabs">
+        <button data-period="7">7d</button>
+        <button data-period="30" class="active">30d</button>
+        <button data-period="90">90d</button>
+      </div>
+      <select id="sort-select">
+        <option value="score_desc">Score de oportunidade ↓</option>
+        <option value="score_asc">Score de oportunidade ↑</option>
+        <option value="last30_desc">Faturamento no período ↓</option>
+        <option value="last30_asc">Faturamento no período ↑</option>
+        <option value="change_desc">Variação 30d ↓</option>
+        <option value="change_asc">Variação 30d ↑</option>
+        <option value="total_desc">Faturamento total ↓</option>
+        <option value="stock_desc">Estoque ↓</option>
+        <option value="stock_asc">Estoque ↑</option>
+        <option value="visits_desc">Visitas ↓</option>
+        <option value="conv_asc">Conversão ↑ (pior primeiro)</option>
+        <option value="conv_desc">Conversão ↓ (melhor primeiro)</option>
+        <option value="name_asc">Nome A→Z</option>
+      </select>
+      <label class="toggle-pill"><input type="checkbox" id="active-toggle" checked> Só ativos (venda ≤90d)</label>
+      <button class="icon-btn" id="export-csv-btn">⭳ Exportar CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:34px">Flag</th>
+          <th data-col="name">Produto</th>
+          <th data-col="store">Marketplace principal</th>
+          <th data-col="qty30" class="num">Qtd. <span id="th-period-1">30d</span></th>
+          <th data-col="last30" class="num active">Faturamento <span id="th-period-2">30d</span></th>
+          <th data-col="change" class="num">Variação</th>
+          <th data-col="stock" class="num">Estoque</th>
+          <th data-col="visits" class="num">Visitas</th>
+          <th data-col="conv" class="num">Conversão</th>
+          <th data-col="score" class="num">Score</th>
+          <th>Tendência</th>
+          <th>Últimos 120 dias</th>
+        </tr></thead>
+        <tbody id="sku-tbody"></tbody>
+      </table>
+    </div>
+    <div class="pager" id="pager"></div>
+  </section>
+
+  <section id="seasonality-section">
+    <div class="section-head">
+      <h2>Sazonalidade</h2>
+      <span class="section-note">Cada barra compara a venda média daquele período com a média diária histórica do próprio item — 100 = igual à média, acima tende a vender mais, abaixo tende a vender menos. Veja o total da empresa ou busque um SKU.</span>
+    </div>
+    <div class="filters" style="margin-bottom:10px">
+      <input type="search" id="season-sku-search" placeholder="Buscar SKU ou produto…" style="min-width:220px">
+      <select id="season-sku-select"><option value="__EMPRESA__">🏢 Total da empresa</option></select>
+    </div>
+    <div class="range-tabs" id="season-gran-tabs" style="margin-bottom:12px;display:inline-flex">
+      <button data-gran="daily">Diário</button>
+      <button data-gran="weekly">Semanal</button>
+      <button data-gran="monthly" class="active">Mensal</button>
+      <button data-gran="quarterly">Trimestral</button>
+      <button data-gran="semestral">Semestral</button>
+    </div>
+    <div class="card" style="padding:16px 10px 6px">
+      <div id="season-chart"></div>
+    </div>
+    <div class="section-note" id="season-hint" style="margin-top:8px"></div>
+  </section>
+
+  <section>
+    <details class="methodology">
+      <summary>Metodologia e limitações — leia antes de confiar nos números</summary>
+      <ul>
+        <li><b>Dados de origem:</b> relatório do ERP com pedido, produto/SKU, loja (marketplace), quantidade e valores, e (quando importado) um relatório separado de saldo de estoque por código. Sem margem/comissão, preço de concorrente, visitas/conversão, posição do anúncio ou avaliações — por isso o painel não sugere cortes de preço nem estima "oportunidade de margem".</li>
+        <li><b>SMA7/14/30:</b> média móvel simples da quantidade vendida por dia, numa série diária que inclui os dias sem venda (não é ausência de dado, é zero real).</li>
+        <li><b>RSI(14):</b> adaptado — calculado sobre a série já suavizada por SMA7, não sobre a quantidade bruta do dia. A maioria dos SKUs vende 0–2 unidades/dia, então RSI sobre o dado bruto vira ruído quase binário; suavizar antes é a mesma lógica do próprio SMA.</li>
+        <li><b>MACD(12,26,9):</b> EMA12 − EMA26 da quantidade diária bruta; linha de sinal = EMA9 do MACD.</li>
+        <li><b>"Variação 30d" (período_change_pct):</b> compara a soma vendida nos últimos 30 dias com a soma vendida nos 30 dias imediatamente anteriores a esses — <code>(últimos30 − anteriores30) / anteriores30 × 100</code>. É o dado <b>bruto</b>, sem suavização: +100% quer dizer "vendeu o dobro do que vendia no mês anterior", não "vendeu 100 unidades".</li>
+        <li><b>"Tendência" (Acelerando/Desacelerando/Misto):</b> o sistema não confia numa coluna só. Ele cruza dois sinais independentes — a <b>Variação 30d</b> acima (o que de fato aconteceu, sem atraso) com o <b>cruzamento SMA7×SMA30 + MACD</b> (momentum suavizado, mais lento pra reagir) — e usa a Variação 30d como critério principal quando ela é forte (≥20% ou ≤−20%), com o SMA/MACD como desempate só quando a variação é fraca/ambígua. Quando os dois sinais concordam, o SKU carrega <code>trend_signals_agree: true</code> (tendência "confirmada" por dois ângulos); quando discordam, continua rotulado pela variação bruta mas com <code>trend_signals_agree: false</code> — fica marcado, não escondido. <b>Não é uma probabilidade validada</b>; a etapa de backtesting (comparar essa heurística contra dados fora da amostra) ainda não foi feita.</li>
+        <li><b>Matriz de decisão promocional (aba Marketing):</b> cruza o nível de demanda (a Tendência acima) com o nível de estoque (cobertura em dias no ritmo atual de venda) pra sugerir PROMOVER / INVESTIGAR / NÃO PROMOVER / SEGURAR, em vez de tratar "caiu venda" como sinônimo automático de "dar desconto". Não usa margem, preço de concorrente nem dado de exposição/conversão do anúncio — esses fatores, quando existirem, devem entrar como filtro humano por cima da sugestão.</li>
+        <li><b>Quadro de oportunidades por mês:</b> os botões de mês (últimos 5) recalculam a tendência comparando mês fechado vs. mês fechado anterior (em vez de 30d corridos vs. 30d anteriores), com o mesmo critério de reconciliação (variação manda quando é forte, SMA/MACD no fim daquele mês desempata quando é fraca). O mês mais recente ("· agora") usa o instantâneo ao vivo (mais preciso). Uma limitação real: o <b>estoque mostrado é sempre o atual</b> em qualquer mês selecionado — não existe histórico de saldo de estoque salvo por mês nesta planilha, então a lane "Parados com estoque" de um mês passado mistura demanda daquele mês com estoque de hoje.</li>
+        <li><b>Setas de sequência (▼▼▼ / ▲▲▲):</b> conta quantos meses SEGUIDOS, olhando pra trás a partir do mês mais recente com dado, a variação mensal do SKU foi negativa (caiu) ou positiva (subiu) — 1 a 3 setas, corta em 3 mesmo que a sequência seja mais longa. É diferente do rótulo "Acelerando/Desacelerando": aqui é só a direção mês a mês (sinal da variação), sem o limiar de 20% nem a confirmação técnica SMA/MACD — por isso pode aparecer ao lado de "Misto" também. Aparece no Explorador de SKUs (coluna Tendência) e nas lanes Acelerando/Desacelerando do Quadro de oportunidades.</li>
+        <li><b>Projeções (1/7/14/30 dias):</b> extrapolação simples — média diária dos últimos 14 dias × horizonte. É uma linha de base, não um modelo preditivo.</li>
+        <li><b>Sazonalidade:</b> índice = (média de venda por dia naquele período) ÷ (média de venda por dia em todo o histórico do item) × 100. 100 é "igual à média"; acima tende a vender mais que o normal pra esse item, abaixo tende a vender menos. "Semanal" aqui é <b>semana do mês</b> (1ª–5ª semana, pela posição do dia no mês), não semana do ano — captura padrão de início/fim de mês sem virar ruído com 52 baldes quase vazios. Cada barra mostra quantos dias do histórico caíram ali; barras com poucos dias (marcadas no tooltip) são um indício, não um padrão consolidado — SKUs com histórico curto vão ter buracos, principalmente em trimestral/semestral. Não ajusta feriados nem eventos pontuais (Black Friday, por exemplo, aparece misturado no Novembro/T4 normal).</li>
+        <li><b>Estoque × SKU:</b> o relatório de estoque traz um código por modelo (ex.: "129-3709-110V"), enquanto as vendas usam um SKU por lote/variação daquele modelo (ex.: "3709-01-110V", "3709-02-110V"...). A página primeiro tenta casar o código exato (ou exato após remover um prefixo numérico do tipo "511-"); quando não acha, tenta casar pelo <b>modelo base</b> (ignorando o lote) e replica o mesmo saldo do modelo pra cada variação ativa — esse segundo caso fica marcado como <b>"~ estimado"/"compartilhado"</b>, porque o saldo real é um pool único dividido entre as variações, não um saldo individual por SKU. Veja os detalhes na aba "Estoque".</li>
+        <li><b>Importação:</b> cada relatório de vendas substitui a base inteira (full refresh), já que o export do ERP vem com o histórico completo, não incremental. O relatório de estoque substitui só o saldo anterior pelo novo.</li>
+      </ul>
+    </details>
+  </section>
+
+</div><!-- /tab-painel -->
+
+<div id="tab-estoque" hidden>
+  <section id="stock-section">
+    <div class="section-head">
+      <h2>Estoque &amp; projeção de esgotamento</h2>
+      <span class="section-note" id="stock-section-note"></span>
+    </div>
+    <div class="carousel" id="stock-carousel"></div>
+  </section>
+  <section>
+    <div class="section-head">
+      <h2>Todos os itens do relatório de estoque</h2>
+      <span class="section-note">Inclui itens sem correspondência de SKU de vendas (coluna "SKU de vendas" fica em branco nesses casos).</span>
+    </div>
+    <div class="filters">
+      <input type="search" id="stock-search-input" placeholder="Buscar por código ou produto…">
+      <label class="toggle-pill"><input type="checkbox" id="stock-only-matched"> Só itens casados com SKU</label>
+      <button class="icon-btn" id="stock-export-btn">⭳ Exportar CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Código (estoque)</th>
+          <th>Produto</th>
+          <th>SKU de vendas</th>
+          <th class="num">Entradas (período)</th>
+          <th class="num">Saídas (período)</th>
+          <th class="num">Saldo atual</th>
+        </tr></thead>
+        <tbody id="stock-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+  <section>
+    <details class="methodology">
+      <summary>Metodologia do estoque</summary>
+      <ul>
+        <li><b>Dias restantes de estoque / previsão de esgotamento:</b> saldo atual ÷ taxa de venda diária recente (SMA7 do SKU). É uma projeção linear simples — assume que o ritmo recente de venda continua igual, o que raramente é verdade (sazonalidade, promoções, ruptura de fornecedor etc. não entram na conta). Quando a taxa recente é muito baixa ou zero, não mostramos "dias restantes" (a conta explodiria pra um número sem sentido).</li>
+        <li><b>Casamento de código:</b> primeiro tenta o código exato de estoque com o SKU de vendas (ou exato após remover um prefixo numérico). Quando não acha, tenta casar pelo <b>modelo base</b> (removendo o sufixo de lote/variação do SKU) — nesse caso o mesmo saldo do modelo é replicado pra cada variação ativa daquele modelo, marcado com "~ estimado"/"compartilhado" nos cartões e na tabela, porque o saldo real é dividido entre as variações, não individual. Linhas sem nenhum casamento aparecem na tabela abaixo, mas sem projeção.</li>
+      </ul>
+    </details>
+  </section>
+</div><!-- /tab-estoque -->
+
+<div id="tab-calendario" hidden>
+  <section id="calendar-section">
+    <div class="section-head">
+      <h2>Calendário de vendas projetado</h2>
+      <span class="section-note">Clique num dia pra ver quais SKUs têm mais <b>chance</b> de vender nesse dia. Os candidatos de cada dia são selecionados por <b>lift</b> — o quanto a taxa de venda desse SKU nesse dia-da-semana/mês específico é maior que a taxa média geral do próprio SKU (não é mais só "os mais vendidos de sempre" repetindo todo dia) — combinando a média histórica do dia-da-semana dentro daquele mês com a tendência dos últimos 60 dias. Essa taxa vira uma probabilidade via distribuição de Poisson (chance de vender ≥1 unidade) e é ajustada pelo Score de Oportunidade de cada SKU (0-100: momentum, MACD, OBV, WMA, RSI, volume, estatística, Fibonacci, sazonalidade, tendência, estoque e padrões já calculados). Ordenado por chance. Ainda pode repetir alguns SKUs entre dias próximos — quando um item realmente vende bem quase todo dia, isso é real, não erro de cálculo. É uma heurística estatística, não uma previsão validada por backtesting — dá pra exportar em CSV (com o lift de cada item) pra testar por fora.</span>
+    </div>
+    <div class="filters" style="margin-bottom:10px">
+      <select id="calendar-store-filter"><option value="__ALL__">Todos os marketplaces</option></select>
+      <button class="icon-btn" id="calendar-export-btn">⭳ Exportar CSV</button>
+    </div>
+    <div class="carousel" id="calendar-carousel"></div>
+    <div class="card" id="calendar-results" style="margin-top:12px"></div>
+  </section>
+  <section>
+    <details class="methodology">
+      <summary>Metodologia do calendário</summary>
+      <ul>
+        <li>Pra cada SKU e dia da semana, calculamos a quantidade média vendida naquele dia da semana ao longo de todo o histórico (soma da quantidade nesse dia-da-semana ÷ número de vezes que esse dia-da-semana apareceu no período). É sazonalidade semanal básica, não um modelo de série temporal — não considera feriados, promoções pontuais ou tendência recente.</li>
+      </ul>
+    </details>
+  </section>
+</div><!-- /tab-calendario -->
+
+<div id="tab-marketing" hidden>
+  <section id="marketing-compare-section">
+    <div class="section-head">
+      <h2>Comparativo de itens mais vendidos</h2>
+      <span class="section-note">Compare até 4 SKUs lado a lado, do jeito de um gráfico financeiro — escolha o que aparece na tela, o período e a métrica. Começa com os 4 mais vendidos; troque como quiser.</span>
+    </div>
+    <div class="filters" style="margin-bottom:10px">
+      <input type="search" id="mcmp-search" placeholder="Buscar SKU ou produto pra adicionar…" style="min-width:220px">
+      <select id="mcmp-add-select"><option value="">+ Adicionar item ao comparativo…</option></select>
+      <select id="mcmp-metric">
+        <option value="q">Quantidade</option>
+        <option value="r">Faturamento</option>
+      </select>
+      <label class="toggle-pill"><input type="checkbox" id="mcmp-smooth"> Suavizar (SMA7)</label>
+      <label class="toggle-pill"><input type="checkbox" id="mcmp-normalize"> Comparar em % (índice 100 no início)</label>
+    </div>
+    <div id="mcmp-chips" class="chip-row" style="margin-bottom:10px"></div>
+    <div class="section-head" style="margin-top:0">
+      <span class="section-note">Janela visível:</span>
+      <div class="range-tabs" id="mcmp-range-tabs">
+        <button data-range="30">30d</button>
+        <button data-range="90">90d</button>
+        <button data-range="180" class="active">180d</button>
+        <button data-range="365">1a</button>
+        <button data-range="all">tudo</button>
+      </div>
+    </div>
+    <div class="card" id="mcmp-loading" style="text-align:center;padding:30px;color:var(--text-muted)">Carregando série de dados…</div>
+    <div class="card" id="mcmp-chart-card" hidden style="padding:12px 8px 6px">
+      <div id="mcmp-chart"></div>
+    </div>
+    <div class="section-note" style="margin-top:8px">Mesma base de dado do Gráfico Interativo (série diária regularizada, últimos 365 dias) — sem estoque, margem ou preço de concorrente. "Comparar em %" reindexa cada item pra 100 no primeiro dia da janela visível, útil pra ver quem cresce/cai mais rápido mesmo quando os volumes absolutos são bem diferentes.</div>
+  </section>
+  <section>
+    <div class="section-head">
+      <h2>Marketing — leituras a partir dos dados</h2>
+      <span class="section-note">Duas coisas diferentes nesta aba: <b>fatos calculados a partir do seu histórico real</b> (marcados assim) e <b>práticas gerais de mercado</b> vindas de pesquisa externa (marcadas assim) — que não foram validadas contra os seus números especificamente. Nenhuma das duas é garantia de resultado.</span>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <h3 style="font-size:13px;margin-bottom:4px">📊 A partir dos seus dados</h3>
+      <p class="section-note">Calculado direto do seu histórico de vendas e estoque — não é uma recomendação externa.</p>
+    </div>
+    <div id="marketing-data-cards" class="board" style="grid-template-columns:repeat(2,1fr)"></div>
+  </section>
+  <section>
+    <div class="section-head">
+      <h2>Matriz de decisão promocional</h2>
+      <span class="section-note">Cruza <b>demanda</b> (tendência recalculada — variação 30d bruta + confirmação SMA/MACD) com <b>estoque</b> (cobertura em dias no ritmo atual). Em vez de "caiu venda = desconto", cada SKU cai num dos 5 quadrantes abaixo, com o motivo escrito por extenso.</span>
+    </div>
+    <div id="promo-matrix-legend" class="card" style="margin-bottom:14px"></div>
+    <div id="promo-matrix-cards" class="board" style="grid-template-columns:repeat(2,1fr)"></div>
+  </section>
+  <section>
+    <div class="card" style="margin-bottom:14px">
+      <h3 style="font-size:13px;margin-bottom:4px">🌐 Práticas gerais de mercado (pesquisa externa)</h3>
+      <p class="section-note">Táticas comuns pra quem vende em vários marketplaces ao mesmo tempo — genéricas, não calculadas a partir dos seus dados. Avalie o que faz sentido pro seu caso.</p>
+    </div>
+    <div id="marketing-external-cards" class="board" style="grid-template-columns:repeat(2,1fr)"></div>
+    <div class="card" style="margin-top:14px">
+      <h3 style="font-size:13px;margin-bottom:8px">Leituras recomendadas</h3>
+      <ul id="marketing-links" style="margin:0;padding-left:18px;color:var(--text-secondary);font-size:12.5px;line-height:1.9"></ul>
+    </div>
+  </section>
+</div><!-- /tab-marketing -->
+
+<div id="tab-flags" hidden>
+  <section>
+    <div class="section-head">
+      <h2>Flags de revisão</h2>
+      <span class="section-note">SKUs marcados manualmente no Explorador de SKUs (ícone 🚩 em cada linha) pra acompanhar o que precisa de ação — não é calculado a partir dos dados, é anotação sua. Guardado neste navegador (não sincroniza entre dispositivos).</span>
+    </div>
+    <div class="filters" style="margin-bottom:12px">
+      <input type="search" id="flags-search-input" placeholder="Buscar por nome, SKU ou ação…">
+      <button class="icon-btn" id="flags-export-btn">⭳ Exportar CSV</button>
+    </div>
+    <div class="board" id="flags-board" style="grid-template-columns:repeat(3,1fr)">
+      <div class="lane">
+        <div class="lane-head"><span class="dot" style="background:var(--warning)"></span><h3>Falta alterar</h3><span class="lane-count" id="flags-count-falta_alterar"></span></div>
+        <div id="flags-lane-falta_alterar" class="lane-body" style="max-height:520px"></div>
+      </div>
+      <div class="lane">
+        <div class="lane-head"><span class="dot" style="background:var(--good)"></span><h3>Já alterado</h3><span class="lane-count" id="flags-count-ja_alterado"></span></div>
+        <div id="flags-lane-ja_alterado" class="lane-body" style="max-height:520px"></div>
+      </div>
+      <div class="lane">
+        <div class="lane-head"><span class="dot" style="background:var(--accent)"></span><h3>Revisar</h3><span class="lane-count" id="flags-count-revisar"></span></div>
+        <div id="flags-lane-revisar" class="lane-body" style="max-height:520px"></div>
+      </div>
+    </div>
+    <div class="section-note" id="flags-empty-hint" style="margin-top:14px" hidden>Nenhum SKU marcado ainda. Vá até o Explorador de SKUs (aba Painel) e clique no 🚩 de uma linha pra marcar.</div>
+  </section>
+</div><!-- /tab-flags -->
+
+<div id="tab-grafico" hidden>
+
+  <section id="grafico-section">
+    <div class="section-head">
+      <h2>Gráfico Interativo — análise técnica</h2>
+      <span class="section-note">Indicadores adaptados de análise técnica financeira para dados de vendas. Velas (candlestick) só ficam disponíveis nos períodos Semanal/Mensal — não existe granularidade intradiária nesta planilha. Veja a metodologia completa no fim desta aba.</span>
+    </div>
+    <div class="filters" id="gf-controls">
+      <input type="search" id="gf-sku-search" placeholder="Buscar SKU ou produto…" style="min-width:220px">
+      <select id="gf-sku-select"><option value="__EMPRESA__">🏢 Total da empresa</option></select>
+      <select id="gf-store-select"><option value="">🏬 Todas as lojas</option></select>
+      <select id="gf-metric">
+        <option value="q">Quantidade</option>
+        <option value="r">Faturamento</option>
+      </select>
+      <select id="gf-timeframe">
+        <option value="D">Diário</option>
+        <option value="W">Semanal</option>
+        <option value="M">Mensal</option>
+      </select>
+      <select id="gf-charttype">
+        <option value="line">Linha</option>
+        <option value="area">Área</option>
+        <option value="candle" id="gf-candle-opt">Velas (candlestick)</option>
+      </select>
+    </div>
+    <div class="section-head" style="margin-top:4px">
+      <span class="section-note">Janela visível:</span>
+      <div class="range-tabs" id="gf-range-tabs">
+        <button data-range="15">15d</button>
+        <button data-range="30">30d</button>
+        <button data-range="90">90d</button>
+        <button data-range="180">180d</button>
+        <button data-range="365">1a</button>
+        <button data-range="all" class="active">tudo</button>
+      </div>
+    </div>
+    <div class="indicator-row" id="gf-indicator-row" style="margin-bottom:12px">
+      <span class="section-note" style="margin-right:2px">Indicadores:</span>
+      <button class="chip-toggle" data-gind="EMA_SHORT">EMA 9/21</button>
+      <button class="chip-toggle" data-gind="EMA_LONG">EMA 50/200</button>
+      <button class="chip-toggle" data-gind="FIB">Fibonacci</button>
+      <button class="chip-toggle" data-gind="VOL">Volume</button>
+      <button class="chip-toggle" data-gind="OBV">OBV</button>
+      <button class="chip-toggle" data-gind="ATR">ATR</button>
+      <button class="chip-toggle" data-gind="RSI">RSI</button>
+      <button class="chip-toggle" data-gind="MACD">MACD</button>
+    </div>
+    <div class="card" id="gf-loading" style="text-align:center;padding:30px;color:var(--text-muted)">Carregando série de dados…</div>
+    <div class="card" id="gf-chart-card" hidden style="padding:10px 6px 6px">
+      <div id="gf-main-chart"></div>
+      <div id="gf-vol-chart" style="margin-top:2px"></div>
+      <div id="gf-obv-chart" style="margin-top:2px"></div>
+      <div id="gf-atr-chart" style="margin-top:2px"></div>
+      <div id="gf-rsi-chart" style="margin-top:2px"></div>
+      <div id="gf-macd-chart" style="margin-top:2px"></div>
+    </div>
+  </section>
+
+  <section>
+    <details class="methodology">
+      <summary>Metodologia dos indicadores desta aba — leia antes de confiar nos sinais</summary>
+      <ul>
+        <li><b>Base do gráfico:</b> série diária bruta de quantidade e faturamento, últimos 365 dias por SKU (ou total da empresa, histórico completo). Sem estoque, margem, comissão ou preço de concorrente — os mesmos limites do painel principal se aplicam aqui.</li>
+        <li><b>EMA 9/21 e 50/200:</b> médias móveis exponenciais padrão, calculadas sobre a quantidade (ou faturamento) diária/semanal/mensal conforme o período escolhido. Cruzamento de curto prazo (9/21) sinaliza mudança de ritmo recente; cruzamento de longo prazo (50/200) sinaliza tendência estrutural — nenhum dos dois é uma previsão.</li>
+        <li><b>Volume:</b> aqui não existe "volume de negociação" — o histograma mostra a própria quantidade vendida (ou faturamento) por período, como referência de intensidade.</li>
+        <li><b>OBV (On-Balance Volume) — adaptado:</b> na análise técnica financeira, OBV soma o volume no dia em que o preço sobe e subtrai no dia em que cai. Aqui não há "preço" diário por SKU nesta planilha, então adaptamos: o volume acumulado é a própria quantidade vendida, e a "direção" usada é a variação dia a dia do faturamento (net_sales) — sobe soma, desce subtrai, dia neutro não altera. É uma adaptação experimental, não o OBV clássico.</li>
+        <li><b>ATR (Average True Range) — adaptado:</b> o ATR clássico precisa de máxima, mínima e fechamento intradiário, que não existem aqui em base diária. Em período Semanal/Mensal, calculamos um "True Range" de verdade usando máximo/mínimo/abertura/fechamento dentro de cada vela (resample dos dias). Em período Diário, como não há velas, usamos uma aproximação simplificada: a variação absoluta dia a dia (|valor hoje − valor ontem|), suavizada por média móvel de 14 períodos — isto NÃO é o ATR real, é um substituto grosseiro só pra dar noção de volatilidade recente.</li>
+        <li><b>Velas semanais/mensais:</b> como a planilha não tem hora do pedido, não existe candle diário de verdade. As velas mostradas em período Semanal/Mensal são sintéticas: Abertura = primeiro dia do período, Máxima/Mínima = maior/menor valor diário no período, Fechamento = último dia do período. Útil pra ver a amplitude de variação dentro da semana/mês, mas não é um candle de mercado financeiro.</li>
+        <li><b>Fibonacci (retração):</b> pega a máxima e a mínima de TODO o range visível no gráfico (respeitando a janela de tempo e o filtro de loja escolhidos) e traça 7 linhas horizontais nos níveis clássicos de retração (0% / 23,6% / 38,2% / 50% / 61,8% / 78,6% / 100%) entre esse pico e esse vale — mesma lógica usada em qualquer plataforma de análise técnica, só que aqui aplicada a quantidade/faturamento em vez de preço. É uma leitura visual de onde uma correção tende a "respirar" dentro do range, não uma previsão nem algo validado por backtesting nesta planilha.</li>
+        <li><b>RSI(14) e MACD(12,26,9):</b> mesma lógica documentada no painel principal — RSI calculado sobre a série suavizada, MACD sobre a série bruta do período escolhido.</li>
+      </ul>
+    </details>
+  </section>
+
+</div><!-- /tab-grafico -->
+
+<div id="tab-atualizar" hidden>
+  <section>
+    <div class="section-head">
+      <h2>Atualizar dados</h2>
+      <span class="section-note">Este painel é uma página publicada (estática) — ela não tem um servidor próprio rodando por trás, então não consegue ler sua planilha e recalcular tudo sozinha. A atualização acontece aqui, comigo, e o resultado é republicado nesta mesma página.</span>
+    </div>
+    <div class="card">
+      <h3 style="font-size:13px;margin-bottom:10px">Última importação — vendas</h3>
+      <div class="stat-row" id="update-stats" style="grid-template-columns:repeat(3,1fr)"></div>
+    </div>
+    <div class="card" style="margin-top:14px" id="update-stock-card">
+      <h3 style="font-size:13px;margin-bottom:10px">Última importação — estoque</h3>
+      <div class="stat-row" id="update-stock-stats" style="grid-template-columns:repeat(4,1fr)"></div>
+      <p class="section-note" id="update-stock-note" style="margin-top:10px"></p>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h3 style="font-size:13px;margin-bottom:10px">Como atualizar</h3>
+      <ol style="margin:0;padding-left:18px;color:var(--text-secondary);font-size:12.5px;line-height:1.8">
+        <li>Baixe o relatório mais recente do ERP — de <b>vendas</b> (export completo, com a coluna de <b>Código do Produto</b>) e/ou de <b>estoque</b> (saldo atual por código).</li>
+        <li>Anexe o(s) arquivo(s) na nossa conversa (<code>.xlsx</code> ou <code>.xls</code>) e peça pra eu atualizar o Magalu Sales Intelligence.</li>
+        <li>Eu reimporto (vendas é sempre histórico completo — full refresh; estoque também substitui o saldo anterior pelo novo), recalculo os indicadores e republico esta mesma página — o link não muda.</li>
+      </ol>
+      <p class="section-note" style="margin-top:10px">Sem atalho por enquanto: esta página é publicada e estática, sem servidor próprio rodando atrás dela — por isso ela não consegue processar o arquivo sozinha só por você selecionar aqui embaixo. Mas o pedido é rápido: me manda o arquivo na conversa que eu já devolvo o link atualizado.</p>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h3 style="font-size:13px;margin-bottom:8px">Selecionar arquivo (opcional)</h3>
+      <p class="section-note" style="margin-bottom:10px">Escolha aqui só pra conferir nome/tamanho antes de anexar na conversa — esta página não envia nem processa o arquivo.</p>
+      <input type="file" id="update-file-picker" accept=".xlsx,.xls">
+      <div class="section-note" id="update-file-info" style="margin-top:8px"></div>
+    </div>
+  </section>
+</div><!-- /tab-atualizar -->
+</div>
+
+<div id="scrim"></div>
+<div id="drawer"></div>
+<div id="flag-popover">
+  <h4>🚩 Marcar flag</h4>
+  <div class="fp-name" id="fp-name"></div>
+  <select id="fp-status">
+    <option value="falta_alterar">Falta alterar</option>
+    <option value="ja_alterado">Já alterado</option>
+    <option value="revisar">Revisar</option>
+  </select>
+  <input type="text" id="fp-action" placeholder="Nome da ação (ex.: trocar título do anúncio)" maxlength="140">
+  <div class="fp-actions">
+    <button type="button" class="fp-remove" id="fp-remove" hidden>Remover</button>
+    <button type="button" id="fp-cancel">Cancelar</button>
+    <button type="button" class="fp-save" id="fp-save">Salvar</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+(function(){
+"use strict";
+
+var STATE = { data:null, filtered:[], page:0, pageSize:25, sortKey:"last30", sortDir:"desc",
+  activeOnly:true, search:"", storeFilter:"", overviewRange:180, indicators:["SMA"],
+  kpiRange:30, explorerPeriod:30, boardStoreFilter:"", boardDateFrom:"", boardDateTo:"", boardMonth:"",
+  seasonSku:"__EMPRESA__", seasonGran:"monthly" };
+var PAGE_SIZE = 25;
+
+/* ---- seletor de paleta de cores ---- */
+(function(){
+  var sel = document.getElementById("theme-select");
+  if(!sel) return;
+  var current = "";
+  try{ current = localStorage.getItem("msi-palette") || ""; }catch(e){}
+  sel.value = current;
+  sel.addEventListener("change", function(){
+    var v = sel.value;
+    if(v) document.documentElement.setAttribute("data-palette", v);
+    else document.documentElement.removeAttribute("data-palette");
+    try{ localStorage.setItem("msi-palette", v); }catch(e){}
+  });
+})();
+
+/* ---------------- flags de revisão (por SKU, salvas no navegador) ----------------
+   Anotação manual do usuário (não é calculada a partir dos dados): cada SKU
+   marcado guarda um status ("falta_alterar" / "ja_alterado" / "revisar") e
+   um texto livre com o nome da ação. Guardado em localStorage — por
+   navegador, não sincroniza entre dispositivos nem é lido pelo Claude. */
+var FLAG_META = {
+  falta_alterar: {label:"Falta alterar", icon:"🛠️", tone:"var(--warning)"},
+  ja_alterado:   {label:"Já alterado",   icon:"✅", tone:"var(--good)"},
+  revisar:       {label:"Revisar",       icon:"🔎", tone:"var(--accent)"}
+};
+var FLAGS = {};
+(function(){
+  try{ FLAGS = JSON.parse(localStorage.getItem("msi-flags") || "{}") || {}; }catch(e){ FLAGS = {}; }
+})();
+function saveFlagsStore(){
+  try{ localStorage.setItem("msi-flags", JSON.stringify(FLAGS)); }catch(e){}
+}
+function flagCount(){ return Object.keys(FLAGS).length; }
+function updateFlagsTabBadge(){
+  var el = document.getElementById("flags-tab-count");
+  if(!el) return;
+  var n = flagCount();
+  el.textContent = n;
+  el.hidden = n===0;
+}
+function flagCellHtml(sku){
+  var f = FLAGS[sku];
+  if(!f){
+    return '<button type="button" class="flag-btn" data-flag-sku="'+esc(sku)+'" title="Marcar flag">🚩</button>';
+  }
+  var m = FLAG_META[f.status] || FLAG_META.revisar;
+  var tip = m.label + (f.action ? " — "+f.action : "");
+  return '<button type="button" class="flag-btn flag-set" data-flag-sku="'+esc(sku)+'" title="'+esc(tip)+'">'+m.icon+'</button>';
+}
+
+var flagPopoverSku = null;
+function openFlagPopover(sku, anchorEl){
+  var s = findSku(sku);
+  flagPopoverSku = sku;
+  var pop = document.getElementById("flag-popover");
+  var f = FLAGS[sku];
+  document.getElementById("fp-name").textContent = (s ? s.name : sku) + " · " + sku;
+  document.getElementById("fp-status").value = f ? f.status : "falta_alterar";
+  document.getElementById("fp-action").value = f ? (f.action||"") : "";
+  document.getElementById("fp-remove").hidden = !f;
+  pop.classList.add("open");
+  // posiciona perto do botão clicado, sem sair da tela
+  var r = anchorEl.getBoundingClientRect();
+  var popW = 260, popH = 220;
+  var left = Math.min(Math.max(8, r.left), window.innerWidth - popW - 8);
+  var top = r.bottom + 6;
+  if(top + popH > window.innerHeight) top = Math.max(8, r.top - popH - 6);
+  pop.style.left = left + "px";
+  pop.style.top = top + "px";
+  setTimeout(function(){ document.getElementById("fp-action").focus(); }, 0);
+}
+function closeFlagPopover(){
+  document.getElementById("flag-popover").classList.remove("open");
+  flagPopoverSku = null;
+}
+(function flagPopoverWiring(){
+  document.getElementById("fp-cancel").addEventListener("click", closeFlagPopover);
+  document.getElementById("fp-save").addEventListener("click", function(){
+    if(!flagPopoverSku) return;
+    var status = document.getElementById("fp-status").value;
+    var action = document.getElementById("fp-action").value.trim();
+    FLAGS[flagPopoverSku] = {status:status, action:action, ts:new Date().toISOString()};
+    saveFlagsStore();
+    refreshFlagUi();
+    closeFlagPopover();
+  });
+  document.getElementById("fp-remove").addEventListener("click", function(){
+    if(!flagPopoverSku) return;
+    delete FLAGS[flagPopoverSku];
+    saveFlagsStore();
+    refreshFlagUi();
+    closeFlagPopover();
+  });
+  document.getElementById("flag-popover").addEventListener("click", function(e){ e.stopPropagation(); });
+  document.addEventListener("click", function(e){
+    var pop = document.getElementById("flag-popover");
+    if(pop.classList.contains("open") && !e.target.closest("[data-flag-sku]")) closeFlagPopover();
+  });
+  document.addEventListener("keydown", function(e){
+    if(e.key==="Escape") closeFlagPopover();
+  });
+})();
+/* liga os botões 🚩 de um container (tabela, cards de flag, drawer) — chamada
+   depois de cada render, em vez de delegar no document: um clique no botão
+   dentro da linha da tabela já para a propagação (pra não abrir o drawer
+   junto), então um listener no document nunca veria esse clique. */
+function bindFlagButtons(root){
+  (root||document).querySelectorAll("[data-flag-sku]").forEach(function(btn){
+    if(btn._flagBound) return;
+    btn._flagBound = true;
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      openFlagPopover(btn.getAttribute("data-flag-sku"), btn);
+    });
+  });
+}
+function refreshFlagUi(){
+  updateFlagsTabBadge();
+  if(STATE.page!=null && document.getElementById("sku-tbody")) renderTablePage();
+  if(!document.getElementById("tab-flags").hidden) renderFlagsTab();
+}
+function flagCard(sku, f){
+  var s = findSku(sku);
+  var name = s ? s.name : sku;
+  var when = f.ts ? fmtDate(f.ts.slice(0,10)) : "";
+  return '<div class="flag-card">'+
+    '<div class="nm" data-open-sku="'+esc(sku)+'">'+esc(name)+'</div>'+
+    '<div class="code">'+esc(sku)+'</div>'+
+    (f.action ? '<div class="act">'+esc(f.action)+'</div>' : '<div class="act" style="color:var(--text-muted)">(sem nome de ação)</div>')+
+    '<div class="meta"><span>'+(when?"marcado em "+when:"")+'</span><button type="button" data-flag-sku="'+esc(sku)+'">editar</button></div>'+
+  '</div>';
+}
+function renderFlagsTab(){
+  var q = (document.getElementById("flags-search-input").value||"").trim().toLowerCase();
+  var groups = {falta_alterar:[], ja_alterado:[], revisar:[]};
+  Object.keys(FLAGS).forEach(function(sku){
+    var f = FLAGS[sku];
+    if(!groups[f.status]) return;
+    if(q){
+      var s = findSku(sku);
+      var hay = (sku+" "+(s?s.name:"")+" "+(f.action||"")).toLowerCase();
+      if(hay.indexOf(q)<0) return;
+    }
+    groups[f.status].push({sku:sku, f:f});
+  });
+  Object.keys(groups).forEach(function(status){
+    var items = groups[status].sort(function(a,b){ return (b.f.ts||"").localeCompare(a.f.ts||""); });
+    document.getElementById("flags-count-"+status).textContent = items.length;
+    var body = document.getElementById("flags-lane-"+status);
+    body.innerHTML = items.length
+      ? items.map(function(it){ return flagCard(it.sku, it.f); }).join("")
+      : '<div class="op-empty">Nenhum SKU aqui.</div>';
+  });
+  document.getElementById("flags-empty-hint").hidden = flagCount()>0;
+  bindFlagButtons(document.getElementById("flags-board"));
+  document.querySelectorAll('#flags-board [data-open-sku]').forEach(function(el){
+    el.addEventListener("click", function(){
+      var sku = el.getAttribute("data-open-sku");
+      document.querySelector('#main-tabs button[data-tab="painel"]').click();
+      openDrawer(sku);
+    });
+  });
+}
+(function flagsSearchWiring(){
+  var input = document.getElementById("flags-search-input");
+  if(input) input.addEventListener("input", debounce(renderFlagsTab, 150));
+  var exportBtn = document.getElementById("flags-export-btn");
+  if(exportBtn) exportBtn.addEventListener("click", function(){
+    var header = ["SKU","Produto","Status","Acao","Marcado_em"];
+    var rows = Object.keys(FLAGS).map(function(sku){
+      var f = FLAGS[sku], s = findSku(sku);
+      return [sku, s?s.name:"", (FLAG_META[f.status]||{}).label||f.status, f.action||"", (f.ts||"").slice(0,16).replace("T"," ")];
+    });
+    exportRowsAsCsv("flags", header, rows, "flags-export-btn");
+  });
+})();
+
+function sumTail(arr, days){
+  if(!arr || !arr.length) return 0;
+  var slice = arr.slice(-days);
+  return slice.reduce(function(a,b){ return a+(b||0); }, 0);
+}
+/* Quantidade/faturamento de um SKU num período — usa os totais prontos de
+   30d quando o período é 30 (mais preciso, cobre todo o histórico), e soma
+   os últimos N dias da sparkline (120 dias) pros demais períodos. */
+function periodQty(s, days){ return days===30 ? s.last_30d_qty : sumTail(s.spark_qty, days); }
+function periodSales(s, days){ return days===30 ? s.last_30d_sales : sumTail(s.spark_net_sales, days); }
+
+function fmtBRL(v){
+  if(v==null || isNaN(v)) return "—";
+  return "R$ " + Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtBRLShort(v){
+  if(v==null || isNaN(v)) return "—";
+  var abs = Math.abs(v);
+  if(abs>=1000000) return "R$ "+(v/1000000).toLocaleString("pt-BR",{maximumFractionDigits:1})+"M";
+  if(abs>=1000) return "R$ "+(v/1000).toLocaleString("pt-BR",{maximumFractionDigits:1})+"mil";
+  return fmtBRL(v);
+}
+function fmtPct(v){
+  if(v==null || isNaN(v)) return "—";
+  var s = v>0 ? "+" : "";
+  return s + v.toLocaleString("pt-BR",{maximumFractionDigits:1}) + "%";
+}
+function fmtInt(v){ return v==null ? "—" : Number(v).toLocaleString("pt-BR"); }
+function esc(s){ var d=document.createElement("div"); d.textContent = s==null? "": String(s); return d.innerHTML; }
+
+/* ---------------- fundo personalizado (por-viewer, IndexedDB) ---------------- */
+(function bgFeature(){
+  var DB_NAME="msi-bg", STORE="files";
+  function openDb(){
+    return new Promise(function(resolve,reject){
+      try{
+        var req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = function(){ req.result.createObjectStore(STORE); };
+        req.onsuccess = function(){ resolve(req.result); };
+        req.onerror = function(){ reject(req.error); };
+      }catch(e){ reject(e); }
+    });
+  }
+  function idbGet(key){
+    return openDb().then(function(db){
+      return new Promise(function(resolve,reject){
+        var tx = db.transaction(STORE,"readonly").objectStore(STORE).get(key);
+        tx.onsuccess=function(){ resolve(tx.result); };
+        tx.onerror=function(){ reject(tx.error); };
+      });
+    });
+  }
+  function idbSet(key,val){
+    return openDb().then(function(db){
+      return new Promise(function(resolve,reject){
+        var tx = db.transaction(STORE,"readwrite").objectStore(STORE).put(val,key);
+        tx.onsuccess=function(){ resolve(); };
+        tx.onerror=function(){ reject(tx.error); };
+      });
+    });
+  }
+  function idbDel(key){
+    return openDb().then(function(db){
+      return new Promise(function(resolve){
+        var tx = db.transaction(STORE,"readwrite").objectStore(STORE).delete(key);
+        tx.onsuccess=function(){ resolve(); };
+        tx.onerror=function(){ resolve(); };
+      });
+    });
+  }
+  function applyBg(dataUrl){
+    var layer = document.getElementById("bg-layer");
+    var scrim = document.getElementById("bg-scrim");
+    if(dataUrl){
+      layer.style.backgroundImage = "url(" + dataUrl + ")";
+      layer.classList.add("active");
+      scrim.classList.add("dimmed");
+      document.getElementById("bg-reset-btn").hidden = false;
+    } else {
+      layer.classList.remove("active");
+      scrim.classList.remove("dimmed");
+      document.getElementById("bg-reset-btn").hidden = true;
+    }
+  }
+  idbGet("background").then(function(val){ if(val) applyBg(val); }).catch(function(){});
+  document.getElementById("bg-upload-btn").addEventListener("click", function(){
+    document.getElementById("bg-file").click();
+  });
+  document.getElementById("bg-file").addEventListener("change", function(e){
+    var file = e.target.files && e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var dataUrl = reader.result;
+      applyBg(dataUrl);
+      idbSet("background", dataUrl).catch(function(){});
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById("bg-reset-btn").addEventListener("click", function(){
+    applyBg(null);
+    idbDel("background").catch(function(){});
+  });
+})();
+
+/* ---- recolher todos os painéis de uma vez (pra vislumbrar o fundo) ---- */
+(function bgFocusFeature(){
+  var btn = document.getElementById("bg-focus-btn");
+  if(!btn) return;
+  function apply(on){
+    document.body.classList.toggle("bg-focus-mode", on);
+    btn.textContent = on ? "🗖 Mostrar painéis" : "🗕 Recolher painéis";
+    btn.title = on ? "Volta a mostrar os painéis" : "Recolhe os painéis pra ver o fundo inteiro";
+  }
+  var saved = false;
+  try{ saved = localStorage.getItem("msi-bg-focus")==="1"; }catch(e){}
+  apply(saved);
+  btn.addEventListener("click", function(){
+    var on = !document.body.classList.contains("bg-focus-mode");
+    apply(on);
+    try{ localStorage.setItem("msi-bg-focus", on?"1":"0"); }catch(e){}
+  });
+})();
+
+/* ---------------- troca de aba (Painel / Gráfico Interativo) ---------------- */
+(function tabsFeature(){
+  document.querySelectorAll("#main-tabs button").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll("#main-tabs button").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      var tab = btn.getAttribute("data-tab");
+      ["painel","grafico","estoque","calendario","marketing","flags","atualizar"].forEach(function(t){
+        document.getElementById("tab-"+t).hidden = tab!==t;
+      });
+      if(tab==="grafico") GF.activate();
+      if(tab==="atualizar") renderUpdateTab();
+      if(tab==="estoque") renderStockTab();
+      if(tab==="marketing") renderMarketingTab();
+      if(tab==="flags") renderFlagsTab();
+    });
+  });
+})();
+
+function renderUpdateTab(){
+  if(!STATE.data) return;
+  var b = STATE.data.overview.import_batch;
+  document.getElementById("update-stats").innerHTML =
+    '<div><small>Arquivo importado</small><strong class="tabular" style="font-size:13px">'+esc(b.source_file)+'</strong></div>'+
+    '<div><small>Importado em</small><strong class="tabular" style="font-size:13px">'+esc((b.imported_at||"").replace("T"," ").slice(0,16))+'</strong></div>'+
+    '<div><small>Pedidos no arquivo</small><strong class="tabular">'+fmtInt(b.order_count)+'</strong></div>';
+
+  var st = STATE.data.overview.stock_info;
+  var stockCard = document.getElementById("update-stock-card");
+  if(!st){
+    stockCard.hidden = true;
+  } else {
+    stockCard.hidden = false;
+    document.getElementById("update-stock-stats").innerHTML =
+      '<div><small>Arquivo importado</small><strong class="tabular" style="font-size:13px">'+esc(st.source_file)+'</strong></div>'+
+      '<div><small>Referência</small><strong class="tabular" style="font-size:13px">'+esc(st.as_of_label)+'</strong></div>'+
+      '<div><small>Itens no arquivo</small><strong class="tabular">'+fmtInt(st.total_items)+'</strong></div>'+
+      '<div><small>Casados com SKU de vendas</small><strong class="tabular">'+fmtInt(st.matched_items)+' / '+fmtInt(st.total_items)+'</strong></div>';
+    document.getElementById("update-stock-note").textContent =
+      st.unmatched_items>0
+        ? st.unmatched_items+" item(ns) do relatório de estoque não têm um código igual a nenhum SKU de vendas (sistemas de código diferentes) — esses ficam de fora das projeções por SKU, mas o total de estoque conta todos os "+st.total_items+" itens."
+        : "Todos os itens do relatório de estoque bateram com um SKU de vendas.";
+  }
+}
+(function updateFilePicker(){
+  var input = document.getElementById("update-file-picker");
+  if(!input) return;
+  input.addEventListener("change", function(e){
+    var f = e.target.files && e.target.files[0];
+    var info = document.getElementById("update-file-info");
+    if(!f){ info.textContent = ""; return; }
+    var sizeMb = (f.size/1024/1024).toFixed(2);
+    info.textContent = "Selecionado: " + f.name + " (" + sizeMb + " MB). Agora anexe esse mesmo arquivo aqui na conversa e me peça pra atualizar.";
+  });
+})();
+
+/* ---------------- Aba "Gráfico Interativo" (EMA/Volume/OBV/ATR/RSI/MACD/velas) ---------------- */
+var GF = (function(){
+  var loaded=false, loading=false, seriesData=null, skuList=null;
+  var charts=[]; // registry pra destruir entre renders
+  var gfRange = "all"; // janela visível: 15/30/90/180/365/all
+
+  function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  var pendingSeriesCbs = [];
+  /* carregador compartilhado de series_365d.json — usado pela própria aba
+     Gráfico Interativo e também pelo comparativo de Marketing, pra não
+     baixar o mesmo arquivo (~14MB) duas vezes quando o usuário visita as
+     duas abas na mesma sessão. */
+  function ensureSeries(cb){
+    if(loaded){ cb(seriesData); return; }
+    pendingSeriesCbs.push(cb);
+    if(loading) return;
+    loading = true;
+    fetch("series_365d.json").then(function(r){ return r.json(); }).then(function(json){
+      seriesData = json;
+      loading=false; loaded=true;
+      var cbs = pendingSeriesCbs; pendingSeriesCbs = [];
+      cbs.forEach(function(fn){ fn(seriesData); });
+    }).catch(function(err){
+      loading=false;
+      document.getElementById("gf-loading").hidden = false;
+      document.getElementById("gf-loading").textContent = "Não consegui carregar series_365d.json — " + String(err);
+    });
+  }
+  function activate(){
+    if(loaded){ render(); return; }
+    ensureSeries(function(){
+      buildSkuList();
+      populateStoreSelect();
+      wireGfControls();
+      document.getElementById("gf-loading").hidden = true;
+      document.getElementById("gf-chart-card").hidden = false;
+      render();
+    });
+  }
+
+  function buildSkuList(){
+    // ordena pelos dados já carregados no painel (faturamento total), quando disponíveis
+    var order = {};
+    if(STATE.data && STATE.data.skus){
+      STATE.data.skus.forEach(function(s){ order[s.sku] = s.total_sales||0; });
+    }
+    skuList = Object.keys(seriesData).map(function(sku){
+      return {sku:sku, name:seriesData[sku].n, rank: order[sku]!=null?order[sku]:0};
+    }).sort(function(a,b){ return b.rank-a.rank; });
+    populateSkuSelect(skuList);
+  }
+  function populateSkuSelect(list){
+    var sel = document.getElementById("gf-sku-select");
+    var current = sel.value || "__EMPRESA__";
+    var html = '<option value="__EMPRESA__">🏢 Total da empresa</option>';
+    html += list.slice(0,4000).map(function(it){
+      return '<option value="'+esc(it.sku)+'">'+esc(it.name)+' — '+esc(it.sku)+'</option>';
+    }).join("");
+    sel.innerHTML = html;
+    if(list.some(function(it){return it.sku===current;}) || current==="__EMPRESA__") sel.value = current;
+  }
+  function populateStoreSelect(){
+    var sel = document.getElementById("gf-store-select");
+    var stores = seriesData._stores || [];
+    sel.innerHTML = '<option value="">🏬 Todas as lojas</option>' +
+      stores.map(function(st){ return '<option value="'+esc(st)+'">'+esc(st)+'</option>'; }).join("");
+  }
+  function wireGfControls(){
+    document.getElementById("gf-sku-search").addEventListener("input", debounce(function(e){
+      var q = e.target.value.trim().toLowerCase();
+      var filtered = !q ? skuList : skuList.filter(function(it){
+        return it.name.toLowerCase().indexOf(q)>=0 || it.sku.toLowerCase().indexOf(q)>=0;
+      });
+      populateSkuSelect(filtered);
+    }, 180));
+    ["gf-sku-select","gf-store-select","gf-metric","gf-timeframe","gf-charttype"].forEach(function(id){
+      document.getElementById(id).addEventListener("change", function(){
+        syncCandleAvailability();
+        render();
+      });
+    });
+    document.querySelectorAll("#gf-indicator-row .chip-toggle").forEach(function(btn){
+      btn.addEventListener("click", function(){ btn.classList.toggle("active"); render(); });
+    });
+    document.querySelectorAll("#gf-range-tabs button").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        document.querySelectorAll("#gf-range-tabs button").forEach(function(b){ b.classList.remove("active"); });
+        btn.classList.add("active");
+        gfRange = btn.getAttribute("data-range");
+        render();
+      });
+    });
+    window.addEventListener("resize", debounce(function(){ if(!document.getElementById("tab-grafico").hidden) render(); }, 220));
+  }
+  function syncCandleAvailability(){
+    var tf = document.getElementById("gf-timeframe").value;
+    var typeSel = document.getElementById("gf-charttype");
+    var candleOpt = document.getElementById("gf-candle-opt");
+    if(tf==="D"){
+      candleOpt.disabled = true;
+      if(typeSel.value==="candle") typeSel.value = "line";
+    } else {
+      candleOpt.disabled = false;
+    }
+  }
+  function activeIndicators(){
+    var out=[];
+    document.querySelectorAll("#gf-indicator-row .chip-toggle.active").forEach(function(b){ out.push(b.getAttribute("data-gind")); });
+    return out;
+  }
+
+  /* ---- séries base ---- */
+  function getRawSeries(){
+    var skuSel = document.getElementById("gf-sku-select").value;
+    var storeSel = document.getElementById("gf-store-select") ? document.getElementById("gf-store-select").value : "";
+    var out;
+    if(skuSel==="__EMPRESA__"){
+      if(storeSel && seriesData._company_by_store && seriesData._company_by_store[storeSel]){
+        var cs = seriesData._company_by_store[storeSel];
+        out = {dates: cs.d, q: cs.q, r: cs.r};
+      } else if(!storeSel && STATE.data){
+        var ov = STATE.data.overview;
+        out = {dates: ov.company_daily_dates, q: ov.company_daily_qty, r: ov.company_daily_sales};
+      } else {
+        out = {dates:[], q:[], r:[]};
+      }
+    } else {
+      var s = seriesData[skuSel];
+      if(!s){ out = {dates:[], q:[], r:[]}; }
+      else if(storeSel){
+        var bs = s.by_store && s.by_store[storeSel];
+        out = bs ? {dates: s.d.slice(-bs.q.length), q: bs.q, r: bs.r} : {dates:[], q:[], r:[]};
+      } else {
+        out = {dates: s.d, q: s.q, r: s.r};
+      }
+    }
+    if(gfRange && gfRange!=="all"){
+      var n = parseInt(gfRange, 10);
+      out = {dates: out.dates.slice(-n), q: out.q.slice(-n), r: out.r.slice(-n)};
+    }
+    return out;
+  }
+
+  function isoWeekStart(dateStr){
+    var d = new Date(dateStr+"T00:00:00Z");
+    var day = (d.getUTCDay()+6)%7; // 0=segunda
+    d.setUTCDate(d.getUTCDate()-day);
+    return d.toISOString().slice(0,10);
+  }
+  function monthStart(dateStr){ return dateStr.slice(0,7)+"-01"; }
+
+  /* Agrega a série diária (bruta) em candles OHLC por período — usados tanto
+     pro gráfico de velas quanto como base ("close") dos indicadores quando o
+     período é Semanal/Mensal. */
+  function resample(dates, values, timeframe){
+    if(timeframe==="D"){
+      return dates.map(function(d,i){ return {time:d, open:values[i], high:values[i], low:values[i], close:values[i], sum:values[i]}; });
+    }
+    var keyFn = timeframe==="W" ? isoWeekStart : monthStart;
+    var buckets = {}, order = [];
+    dates.forEach(function(d,i){
+      var k = keyFn(d);
+      if(!buckets[k]){ buckets[k] = {time:k, open:values[i], high:values[i], low:values[i], close:values[i], sum:0}; order.push(k); }
+      var b = buckets[k];
+      b.high = Math.max(b.high, values[i]);
+      b.low = Math.min(b.low, values[i]);
+      b.close = values[i];
+      b.sum += values[i];
+    });
+    return order.map(function(k){ return buckets[k]; });
+  }
+
+  /* ---- indicadores ---- */
+  function ema(values, period){
+    var k = 2/(period+1), out=[], prev=null;
+    values.forEach(function(v,i){ prev = (prev==null) ? v : (v*k + prev*(1-k)); out.push(prev); });
+    return out;
+  }
+  function sma(values, period){
+    var out=[];
+    for(var i=0;i<values.length;i++){
+      var start=Math.max(0,i-period+1), slice=values.slice(start,i+1);
+      out.push(slice.reduce(function(a,b){return a+b;},0)/slice.length);
+    }
+    return out;
+  }
+  function rsi(values, period){
+    period = period||14;
+    var gains=[0], losses=[0];
+    for(var i=1;i<values.length;i++){
+      var d = values[i]-values[i-1];
+      gains.push(Math.max(d,0)); losses.push(Math.max(-d,0));
+    }
+    var avgGain=null, avgLoss=null, out=[];
+    for(var j=0;j<values.length;j++){
+      if(j===0){ out.push(50); continue; }
+      if(avgGain==null){
+        if(j<period){ out.push(50); continue; }
+        var gs=gains.slice(1,period+1), ls=losses.slice(1,period+1);
+        avgGain = gs.reduce(function(a,b){return a+b;},0)/period;
+        avgLoss = ls.reduce(function(a,b){return a+b;},0)/period;
+      } else {
+        avgGain = (avgGain*(period-1)+gains[j])/period;
+        avgLoss = (avgLoss*(period-1)+losses[j])/period;
+      }
+      if(avgLoss===0){ out.push(100); continue; }
+      var rs = avgGain/avgLoss;
+      out.push(100-(100/(1+rs)));
+    }
+    return out;
+  }
+  function macdCalc(values){
+    var e12=ema(values,12), e26=ema(values,26);
+    var line = e12.map(function(v,i){ return v-e26[i]; });
+    var signal = ema(line,9);
+    var hist = line.map(function(v,i){ return v-signal[i]; });
+    return {line:line, signal:signal, hist:hist};
+  }
+  function obvCalc(qSum, rSum){
+    var out=[], acc=0;
+    qSum.forEach(function(q,i){
+      if(i>0){
+        var deltaR = rSum[i]-rSum[i-1];
+        if(deltaR>0) acc += q; else if(deltaR<0) acc -= q;
+      }
+      out.push(acc);
+    });
+    return out;
+  }
+  function atrCalc(candles, timeframe){
+    var period=14, tr=[];
+    candles.forEach(function(c,i){
+      if(timeframe==="D"){
+        tr.push(i===0 ? 0 : Math.abs(c.close - candles[i-1].close));
+      } else {
+        var prevClose = i===0 ? c.close : candles[i-1].close;
+        tr.push(Math.max(c.high-c.low, Math.abs(c.high-prevClose), Math.abs(c.low-prevClose)));
+      }
+    });
+    return sma(tr, period);
+  }
+
+  /* ---- render ---- */
+  function destroyCharts(){
+    charts.forEach(function(c){ try{ c.remove(); }catch(e){} });
+    charts = [];
+    ["gf-main-chart","gf-vol-chart","gf-obv-chart","gf-atr-chart","gf-rsi-chart","gf-macd-chart"].forEach(function(id){
+      document.getElementById(id).innerHTML = "";
+    });
+  }
+  function mkChart(containerId, height, opts){
+    var el = document.getElementById(containerId);
+    var chart = LightweightCharts.createChart(el, Object.assign({
+      width: el.clientWidth || 560, height: height,
+      layout: { background: { color: "transparent" }, textColor: cssVar("--text-secondary") },
+      grid: { vertLines:{color:cssVar("--border")}, horzLines:{color:cssVar("--border")} },
+      rightPriceScale: { borderColor: cssVar("--border") },
+      timeScale: { borderColor: cssVar("--border"), rightOffset:2, secondsVisible:false },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+      handleScroll:true, handleScale:true
+    }, opts||{}));
+    charts.push(chart);
+    return chart;
+  }
+
+  function render(){
+    if(!loaded) return;
+    destroyCharts();
+    var metric = document.getElementById("gf-metric").value; // q | r
+    var timeframe = document.getElementById("gf-timeframe").value; // D | W | M
+    var chartType = document.getElementById("gf-charttype").value; // line | area | candle
+    var inds = activeIndicators();
+    var raw = getRawSeries();
+    if(!raw.dates.length){
+      document.getElementById("gf-main-chart").innerHTML = '<div class="stock-empty" style="padding:20px">Esse SKU não teve venda nessa loja.</div>';
+      return;
+    }
+    var valuesQ = raw.q, valuesR = raw.r;
+    var baseValues = metric==="q" ? valuesQ : valuesR;
+    var candlesQ = resample(raw.dates, valuesQ, timeframe);
+    var candlesR = resample(raw.dates, valuesR, timeframe);
+    var candles = metric==="q" ? candlesQ : candlesR;
+    var closeSeries = candles.map(function(c){ return c.close; });
+    var sumSeries = candles.map(function(c){ return c.sum; });
+    var accent = cssVar("--accent"), s2=cssVar("--series-2"), s3=cssVar("--series-3"), s4=cssVar("--series-4"),
+        good=cssVar("--good"), critical=cssVar("--critical");
+
+    var mainH = 680;
+    var main = mkChart("gf-main-chart", mainH);
+    var mainSeries;
+    if(chartType==="candle" && timeframe!=="D"){
+      var cs = main.addCandlestickSeries({upColor:good, downColor:critical, borderVisible:false, wickUpColor:good, wickDownColor:critical});
+      cs.setData(candles.map(function(c){ return {time:c.time, open:c.open, high:c.high, low:c.low, close:c.close}; }));
+      mainSeries = cs;
+    } else if(chartType==="area"){
+      var as = main.addAreaSeries({lineColor:accent, topColor:color_mix_fallback(accent,0.28), bottomColor:color_mix_fallback(accent,0.0), lineWidth:2});
+      as.setData(candles.map(function(c){ return {time:c.time, value:c.close}; }));
+      mainSeries = as;
+    } else {
+      var ls = main.addLineSeries({color:accent, lineWidth:2});
+      ls.setData(candles.map(function(c){ return {time:c.time, value:c.close}; }));
+      mainSeries = ls;
+    }
+    if(inds.indexOf("EMA_SHORT")>=0){
+      addEmaLine(main, closeSeries, candles, 9, s2);
+      addEmaLine(main, closeSeries, candles, 21, s3);
+    }
+    if(inds.indexOf("EMA_LONG")>=0){
+      addEmaLine(main, closeSeries, candles, 50, s4);
+      addEmaLine(main, closeSeries, candles, 200, "#8a8fa0");
+    }
+    if(inds.indexOf("FIB")>=0){
+      addFibLevels(mainSeries, candles);
+    }
+
+    if(inds.indexOf("VOL")>=0){
+      var volC = mkChart("gf-vol-chart", 200, {timeScale:{visible:false}});
+      var volS = volC.addHistogramSeries({color:accent});
+      volS.setData(sumSeries.map(function(v,i){ return {time:candles[i].time, value:v, color:accent}; }));
+      labelPane("gf-vol-chart", "Volume (quantidade/faturamento por período)");
+    }
+    if(inds.indexOf("OBV")>=0){
+      var obvVals = obvCalc(candlesQ.map(function(c){return c.sum;}), candlesR.map(function(c){return c.sum;}));
+      var obvC = mkChart("gf-obv-chart", 200, {timeScale:{visible:false}});
+      var obvS = obvC.addLineSeries({color:s3, lineWidth:2});
+      obvS.setData(obvVals.map(function(v,i){ return {time:candles[i].time, value:v}; }));
+      labelPane("gf-obv-chart", "OBV adaptado (volume=quantidade, direção=variação de faturamento)");
+    }
+    if(inds.indexOf("ATR")>=0){
+      var atrVals = atrCalc(candles, timeframe);
+      var atrC = mkChart("gf-atr-chart", 200, {timeScale:{visible:false}});
+      var atrS = atrC.addLineSeries({color:s2, lineWidth:2});
+      atrS.setData(atrVals.map(function(v,i){ return {time:candles[i].time, value:v}; }));
+      labelPane("gf-atr-chart", timeframe==="D" ? "ATR simplificado (|Δ| suavizado — aproximação, não é o ATR clássico)" : "ATR (True Range sobre velas do período)");
+    }
+    if(inds.indexOf("RSI")>=0){
+      var rsiVals = rsi(closeSeries, 14);
+      var rsiC = mkChart("gf-rsi-chart", 230, {timeScale:{visible: inds.indexOf("MACD")<0}});
+      var rsiS = rsiC.addLineSeries({color:s3, lineWidth:2});
+      rsiS.setData(rsiVals.map(function(v,i){ return {time:candles[i].time, value:v}; }));
+      rsiS.createPriceLine({price:70, color:critical, lineWidth:1, lineStyle:2, axisLabelVisible:true, title:"70"});
+      rsiS.createPriceLine({price:30, color:good, lineWidth:1, lineStyle:2, axisLabelVisible:true, title:"30"});
+      labelPane("gf-rsi-chart", "RSI(14)");
+    }
+    if(inds.indexOf("MACD")>=0){
+      var m = macdCalc(closeSeries);
+      var macdC = mkChart("gf-macd-chart", 240);
+      var histS = macdC.addHistogramSeries({color:accent});
+      histS.setData(m.hist.map(function(v,i){ return {time:candles[i].time, value:v, color: v>=0?good:critical}; }));
+      var lineS = macdC.addLineSeries({color:accent, lineWidth:1.5});
+      lineS.setData(m.line.map(function(v,i){ return {time:candles[i].time, value:v}; }));
+      var sigS = macdC.addLineSeries({color:s2, lineWidth:1.5});
+      sigS.setData(m.signal.map(function(v,i){ return {time:candles[i].time, value:v}; }));
+      labelPane("gf-macd-chart", "MACD(12,26,9)");
+    }
+  }
+  function addEmaLine(chart, closeSeries, candles, period, color){
+    var vals = ema(closeSeries, period);
+    var s = chart.addLineSeries({color:color, lineWidth:1.5, priceLineVisible:false, title:"EMA"+period});
+    s.setData(vals.map(function(v,i){ return {time:candles[i].time, value:v}; }));
+  }
+  /* Fibonacci (retração): pega a máxima e a mínima de TODO o range visível
+     (candles.high/low do período/janela escolhidos) e traça linhas
+     horizontais nos níveis clássicos de retração entre elas — igual
+     qualquer plataforma de análise técnica. Aqui "alta" e "baixa" são
+     quantidade/faturamento do período, não preço, mas a leitura é a
+     mesma: entre o pico e o vale do range visível, esses níveis marcam
+     onde uma correção parcial tende a estacionar. É uma leitura visual,
+     não validada por backtesting nesta planilha (mesma ressalva do resto
+     do painel). */
+  var FIB_LEVELS = [
+    {p:0,     label:"0%"},
+    {p:0.236, label:"23,6%"},
+    {p:0.382, label:"38,2%"},
+    {p:0.5,   label:"50%"},
+    {p:0.618, label:"61,8%"},
+    {p:0.786, label:"78,6%"},
+    {p:1,     label:"100%"}
+  ];
+  function addFibLevels(series, candles){
+    if(!candles.length) return;
+    var hi = Math.max.apply(null, candles.map(function(c){ return c.high; }));
+    var lo = Math.min.apply(null, candles.map(function(c){ return c.low; }));
+    if(!isFinite(hi) || !isFinite(lo) || hi===lo) return;
+    var range = hi - lo;
+    var muted = cssVar("--text-muted"), accent = cssVar("--accent"),
+        s2 = cssVar("--series-2"), s3 = cssVar("--series-3"), s4 = cssVar("--series-4"), good = cssVar("--good");
+    var colorOf = {0:muted, 0.236:s3, 0.382:s2, 0.5:accent, 0.618:good, 0.786:s4, 1:muted};
+    FIB_LEVELS.forEach(function(lv){
+      var price = hi - range*lv.p;
+      series.createPriceLine({
+        price: price, color: colorOf[lv.p] || muted,
+        lineWidth: lv.p===0.5 ? 2 : 1,
+        lineStyle: (lv.p===0||lv.p===1) ? LightweightCharts.LineStyle.Solid : LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true, title: "Fib " + lv.label,
+      });
+    });
+  }
+  function labelPane(containerId, text){
+    var el = document.getElementById(containerId);
+    var lbl = document.createElement("div");
+    lbl.className = "section-note"; lbl.style.margin = "2px 0 2px 4px";
+    lbl.textContent = text;
+    el.parentNode.insertBefore(lbl, el);
+  }
+  function color_mix_fallback(hex, alpha){
+    // lightweight-charts precisa de cor resolvida (não var()); monta rgba a partir do hex
+    var h = hex.replace("#","");
+    if(h.length===3) h = h.split("").map(function(c){return c+c;}).join("");
+    var r=parseInt(h.substr(0,2),16), g=parseInt(h.substr(2,2),16), b=parseInt(h.substr(4,2),16);
+    return "rgba("+r+","+g+","+b+","+alpha+")";
+  }
+
+  return { activate: activate, ensureSeries: ensureSeries };
+})();
+
+/* ---------------- carregamento dos dados ---------------- */
+fetch("dashboard_data.json").then(function(r){ return r.json(); }).then(function(json){
+  STATE.data = json;
+  boot(json);
+}).catch(function(err){
+  document.getElementById("kpis").innerHTML = '<div class="empty-state">Não consegui carregar os dados (dashboard_data.json). '+esc(String(err))+'</div>';
+});
+
+function boot(json){
+  var ov = json.overview;
+  document.getElementById("data-through-label").textContent =
+    "Dados até " + fmtDate(ov.data_through) + " · " + ov.sku_count + " SKUs · importado de " + ov.import_batch.source_file;
+
+  renderKpis(ov);
+  renderStoreBars(ov);
+  renderGeoSection(ov);
+  renderOverviewChart(ov, STATE.overviewRange);
+  renderBoardMonthTabs();
+  renderBoard(json.skus);
+  populateStoreFilter(json.skus);
+  renderStockCarousel(json.skus);
+  initCalendar(json);
+
+  STATE.filtered = json.skus.slice();
+  applyFiltersAndRender();
+
+  wireControls(json);
+  updateFlagsTabBadge();
+  initSeasonalityPanel(json);
+}
+
+function fmtDate(iso){
+  var p = iso.split("-");
+  return p[2]+"/"+p[1]+"/"+p[0];
+}
+
+/* ---------------- KPIs ---------------- */
+function renderKpis(ov){
+  var n = STATE.kpiRange;
+  var dates = ov.company_daily_dates, salesArr = ov.company_daily_sales;
+  var curSales = sumTail(salesArr, n);
+  var prevSales = sumTail(salesArr.slice(0, Math.max(0, salesArr.length-n)), n);
+  var change = prevSales>0 ? ((curSales-prevSales)/prevSales*100) : null;
+  var accelCount=0, decelCount=0, activeCount=0;
+  STATE.data.skus.forEach(function(s){
+    if(s.trend_label==="acelerando") accelCount++;
+    if(s.trend_label==="desacelerando") decelCount++;
+    if(s.last_sale_gap_days!=null && s.last_sale_gap_days<=n) activeCount++;
+  });
+  var tiles = [
+    {label:"Faturamento ("+n+" dias)", value: fmtBRL(curSales), delta: change},
+    {label:"Faturamento período anterior", value: fmtBRL(prevSales), delta:null},
+    {label:"SKUs ativos (venda ≤"+n+"d)", value: activeCount + " / " + ov.sku_count, delta:null},
+    {label:"Acelerando vs. desacelerando", value: accelCount + " ↑ / " + decelCount + " ↓", delta:null}
+  ];
+  document.getElementById("kpis").innerHTML = tiles.map(function(t){
+    var deltaHtml = "";
+    if(t.delta!=null){
+      var cls = t.delta>0.5?"up":(t.delta<-0.5?"down":"flat");
+      deltaHtml = '<span class="delta '+cls+'">'+fmtPct(t.delta)+' vs. período anterior</span>';
+    }
+    return '<div class="kpi"><small>'+esc(t.label)+'</small><strong class="tabular">'+t.value+'</strong>'+deltaHtml+'</div>';
+  }).join("");
+}
+
+/* ---------------- barras por marketplace ---------------- */
+function renderStoreBars(ov){
+  var stores = ov.store_totals.slice().sort(function(a,b){ return b.net_sales-a.net_sales; }).slice(0,8);
+  var max = stores.length? stores[0].net_sales : 1;
+  document.getElementById("store-bars").innerHTML = stores.map(function(s){
+    var pct = Math.max(2, (s.net_sales/max*100));
+    return '<div class="store-bar-row"><span class="name" title="'+esc(s.store)+'">'+esc(s.store)+'</span>'+
+      '<span class="store-bar-track"><span class="store-bar-fill" style="width:'+pct+'%"></span></span>'+
+      '<span class="store-bar-val tabular">'+fmtBRLShort(s.net_sales)+'</span></div>';
+  }).join("");
+}
+
+/* ---------------- geografia, marca, canal, situação, margem ----------------
+   Campos novos do relatório mais recente (Cidade/UF/Marca/Canal de
+   Venda/Situação/Custo Fornecedor) — ausentes em importações antigas, daí
+   os estados vazios por coluna em vez de assumir que sempre tem dado. */
+function renderGeoBars(containerId, rows, limit){
+  var top = (rows||[]).slice(0, limit||10);
+  var max = top.length ? top[0].net_sales : 1;
+  var el = document.getElementById(containerId);
+  if(!top.length){ el.innerHTML = '<div class="empty-state">Sem dado dessa coluna no relatório importado.</div>'; return; }
+  el.innerHTML = top.map(function(r){
+    var pct = Math.max(2, (r.net_sales/max*100));
+    return '<div class="store-bar-row"><span class="name" title="'+esc(r.key)+'">'+esc(r.key)+'</span>'+
+      '<span class="store-bar-track"><span class="store-bar-fill" style="width:'+pct+'%"></span></span>'+
+      '<span class="store-bar-val tabular">'+fmtBRLShort(r.net_sales)+'</span></div>';
+  }).join("");
+}
+function renderGeoSection(ov){
+  var geo = ov.geo;
+  var section = document.getElementById("geo-section");
+  if(!geo){ section.hidden = true; return; }
+  section.hidden = false;
+
+  renderGeoBars("geo-uf-bars", geo.by_uf, 12);
+  renderGeoBars("geo-marca-bars", geo.by_marca, 10);
+  renderGeoBars("geo-canal-bars", geo.by_canal, 8);
+
+  var cityRows = geo.by_city || [];
+  var cityHtml = '<thead><tr><th style="text-align:left;padding:6px 8px">#</th><th style="text-align:left;padding:6px 8px">Cidade</th>'+
+    '<th style="text-align:left;padding:6px 8px">UF</th><th style="text-align:right;padding:6px 8px">Faturamento</th></tr></thead><tbody>';
+  if(cityRows.length){
+    cityRows.forEach(function(c, i){
+      cityHtml += '<tr><td style="padding:5px 8px;color:var(--text-muted)">'+(i+1)+'</td>'+
+        '<td style="padding:5px 8px">'+esc(c.city)+'</td>'+
+        '<td style="padding:5px 8px;color:var(--text-muted)">'+esc(c.uf||"—")+'</td>'+
+        '<td style="padding:5px 8px;text-align:right" class="tabular">'+fmtBRLShort(c.net_sales)+'</td></tr>';
+    });
+  } else {
+    cityHtml += '<tr><td colspan="4" style="padding:10px 8px" class="empty-state">Sem dado de cidade no relatório importado.</td></tr>';
+  }
+  cityHtml += '</tbody>';
+  document.getElementById("geo-city-table").innerHTML = cityHtml;
+
+  var tiles = [];
+  var sit = geo.situacao_totals || [];
+  if(sit.length){
+    var atendido = sit.filter(function(s){ return s.situacao==="Atendido"; })[0];
+    var pendentesN = sit.filter(function(s){ return s.situacao!=="Atendido"; }).reduce(function(a,s){ return a+s.n; }, 0);
+    tiles.push({label:"Pedidos atendidos", value: (atendido? atendido.pct.toFixed(1) : "0")+"%"});
+    tiles.push({label:"Em aberto / em andamento", value: pendentesN+" pedido(s)"});
+  }
+  var m = geo.margin;
+  if(m){
+    tiles.push({label:"Margem bruta estimada", value: fmtBRL(m.margin_value)});
+    tiles.push({label:"Margem bruta (%)", value: (m.margin_pct!=null? m.margin_pct.toFixed(1)+"%" : "—")});
+  }
+  var kpisEl = document.getElementById("geo-kpis");
+  kpisEl.style.display = tiles.length ? "" : "none";
+  kpisEl.innerHTML = tiles.map(function(t){
+    return '<div class="kpi"><small>'+esc(t.label)+'</small><strong class="tabular">'+t.value+'</strong></div>';
+  }).join("");
+
+  var note = document.getElementById("geo-coverage-note");
+  note.textContent = m
+    ? "Margem bruta = Venda Líquida − Custo Fornecedor (não inclui frete, comissão de marketplace nem imposto além do já embutido na Venda Líquida) — calculada sobre "+m.coverage_pct+"% dos pedidos com custo de fornecedor informado."
+    : "Dados novos a partir do relatório mais recente — pedidos de importações antigas sem essas colunas não entram nesses totais.";
+}
+
+/* ---------------- painel de Sazonalidade (diário/semanal/mensal/trimestral/semestral) ---------------- */
+var SEASON_SHORT_LABELS = {
+  quarterly: ["T1","T2","T3","T4"],
+  semestral: ["1º sem","2º sem"]
+};
+var SEASON_MIN_N = {daily:14, weekly:14, monthly:20, quarterly:40, semestral:60};
+var seasonSkuList = null;
+
+function initSeasonalityPanel(json){
+  seasonSkuList = json.skus.slice().sort(function(a,b){ return (b.total_sales||0)-(a.total_sales||0); })
+    .map(function(s){ return {sku:s.sku, name:s.name}; });
+  populateSeasonSkuSelect(seasonSkuList);
+
+  document.getElementById("season-sku-search").addEventListener("input", debounce(function(e){
+    var q = e.target.value.trim().toLowerCase();
+    var filtered = !q ? seasonSkuList : seasonSkuList.filter(function(it){
+      return it.name.toLowerCase().indexOf(q)>=0 || it.sku.toLowerCase().indexOf(q)>=0;
+    });
+    populateSeasonSkuSelect(filtered);
+  }, 180));
+  document.getElementById("season-sku-select").addEventListener("change", function(e){
+    STATE.seasonSku = e.target.value;
+    renderSeasonalityPanel();
+  });
+  document.querySelectorAll("#season-gran-tabs button").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll("#season-gran-tabs button").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      STATE.seasonGran = btn.getAttribute("data-gran");
+      renderSeasonalityPanel();
+    });
+  });
+  window.addEventListener("resize", debounce(function(){
+    if(!document.getElementById("tab-painel").hidden) renderSeasonalityPanel();
+  }, 220));
+
+  renderSeasonalityPanel();
+}
+function populateSeasonSkuSelect(list){
+  var sel = document.getElementById("season-sku-select");
+  var current = sel.value || STATE.seasonSku || "__EMPRESA__";
+  var html = '<option value="__EMPRESA__">🏢 Total da empresa</option>';
+  html += list.slice(0,4000).map(function(it){
+    return '<option value="'+esc(it.sku)+'">'+esc(it.name)+' — '+esc(it.sku)+'</option>';
+  }).join("");
+  sel.innerHTML = html;
+  if(list.some(function(it){return it.sku===current;}) || current==="__EMPRESA__") sel.value = current;
+}
+function currentSeasonalityBundle(){
+  if(!STATE.data) return null;
+  if(!STATE.seasonSku || STATE.seasonSku==="__EMPRESA__") return STATE.data.overview.company_seasonality || null;
+  var s = findSku(STATE.seasonSku);
+  return s ? s.seasonality : null;
+}
+function renderSeasonalityPanel(){
+  var bundle = currentSeasonalityBundle();
+  var el = document.getElementById("season-chart");
+  var hint = document.getElementById("season-hint");
+  if(!bundle){ el.innerHTML = '<div class="empty-state">Sem dado de sazonalidade pra esse item.</div>'; hint.textContent=""; return; }
+  var gran = STATE.seasonGran || "monthly";
+  var raw = bundle[gran] || [];
+  var shortLabels = SEASON_SHORT_LABELS[gran];
+  var buckets = raw.map(function(b, i){
+    return {label:b.label, shortLabel:(shortLabels?shortLabels[i]:b.label), index:b.index, n:b.n};
+  });
+  drawSeasonalityBars(el, buckets, {height:230, minN: SEASON_MIN_N[gran]||10});
+
+  var withData = buckets.filter(function(b){ return b.index!=null && b.n>0; });
+  if(withData.length){
+    var best = withData.reduce(function(a,b){ return b.index>a.index?b:a; });
+    var worst = withData.reduce(function(a,b){ return b.index<a.index?b:a; });
+    hint.innerHTML = 'Pico: <b>'+esc(best.label)+'</b> ('+best.index+'% da média) · Vale: <b>'+esc(worst.label)+'</b> ('+worst.index+'% da média) · histórico usado: '+fmtInt(bundle.dias_historico)+' dias · média diária: '+bundle.media_diaria_historica.toLocaleString("pt-BR",{maximumFractionDigits:2})+' un/dia.';
+  } else {
+    hint.textContent = "Histórico insuficiente pra calcular sazonalidade nessa granularidade.";
+  }
+}
+
+/* ---------------- gráfico geral (linha + área) ---------------- */
+function sliceRange(dates, values, range){
+  if(range==="all") return {dates:dates, values:values};
+  var n = parseInt(range,10);
+  return {dates: dates.slice(-n), values: values.slice(-n)};
+}
+
+function renderOverviewChart(ov, range){
+  var sliced = sliceRange(ov.company_daily_dates, ov.company_daily_sales, range);
+  drawLineChart(document.getElementById("overview-chart"), sliced.dates, [
+    {name:"Faturamento", values: sliced.values, color:"var(--accent)"}
+  ], {height:220, valueFmt: fmtBRLShort, fill:true});
+}
+
+/* Renderiza um gráfico de linha simples em SVG, com crosshair + tooltip.
+   Segue a orientação do dataviz: eixo único, traço fino, hover por padrão. */
+function drawLineChart(container, dates, series, opts){
+  opts = opts || {};
+  var W = Math.max(280, container.clientWidth || 560), H = opts.height || 200;
+  // eixo X com datas: só pros gráficos "grandes" (a sparkline do drawer de
+  // SKU, bem pequena, fica sem — o espaço não dá e a leitura ali é mais
+  // "forma da curva" do que data exata). Desligável via opts.xLabels=false.
+  var showX = (opts.xLabels !== false) && H >= 150;
+  var padL=44, padR=10, padT=10, padB = showX ? 30 : 22;
+  var innerW = W-padL-padR, innerH = H-padT-padB;
+  var allVals = [];
+  series.forEach(function(s){ allVals = allVals.concat(s.values); });
+  var maxV = Math.max.apply(null, allVals.concat([0]));
+  var minV = Math.min.apply(null, allVals.concat([0]));
+  if(maxV===minV) maxV = minV+1;
+  var n = dates.length;
+  function x(i){ return padL + (n<=1?0:(i/(n-1))*innerW); }
+  function y(v){ return padT + innerH - ((v-minV)/(maxV-minV))*innerH; }
+
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" style="display:block;overflow:visible">';
+  // grid + eixo Y (3 linhas)
+  for(var g=0; g<=2; g++){
+    var gv = minV + (maxV-minV)*g/2;
+    var gy = y(gv);
+    svg += '<line x1="'+padL+'" x2="'+(W-padR)+'" y1="'+gy+'" y2="'+gy+'" stroke="var(--border)" stroke-width="1"/>';
+    svg += '<text x="'+(padL-6)+'" y="'+(gy+3)+'" font-size="9.5" text-anchor="end">'+(opts.valueFmt?opts.valueFmt(gv):Math.round(gv))+'</text>';
+  }
+  // eixo X: datas em ~5-7 marcas espalhadas (nunca uma por dia, viraria
+  // ilegível em janelas de 90/180/365 dias) — sempre inclui a primeira e a
+  // última data visível, pra deixar claro o início/fim do recorte.
+  if(showX && n>0){
+    var axisY = padT+innerH;
+    svg += '<line x1="'+padL+'" x2="'+(W-padR)+'" y1="'+axisY+'" y2="'+axisY+'" stroke="var(--border)" stroke-width="1"/>';
+    var targetTicks = Math.max(2, Math.min(7, Math.round(innerW/90)));
+    var tickIdx = [];
+    if(n===1){ tickIdx=[0]; }
+    else {
+      for(var t=0; t<targetTicks; t++){ tickIdx.push(Math.round((t/(targetTicks-1))*(n-1))); }
+    }
+    var seenX = {};
+    tickIdx.forEach(function(i){
+      if(seenX[i]) return; seenX[i]=true;
+      var tx = x(i);
+      svg += '<line x1="'+tx+'" x2="'+tx+'" y1="'+axisY+'" y2="'+(axisY+4)+'" stroke="var(--text-muted)" stroke-width="1"/>';
+      var anchor = (i===0) ? "start" : (i===n-1 ? "end" : "middle");
+      svg += '<text x="'+tx+'" y="'+(axisY+15)+'" font-size="9.5" text-anchor="'+anchor+'" fill="var(--text-muted)">'+esc(fmtDateShort(dates[i]))+'</text>';
+    });
+  }
+  series.forEach(function(s, si){
+    var pts = s.values.map(function(v,i){ return x(i)+","+y(v); }).join(" ");
+    if(opts.fill && si===0){
+      var areaPts = padL+","+(padT+innerH)+" "+pts+" "+(x(n-1))+","+(padT+innerH);
+      svg += '<polygon points="'+areaPts+'" fill="'+s.color+'" opacity="0.10"/>';
+    }
+    svg += '<polyline points="'+pts+'" fill="none" stroke="'+s.color+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+  });
+  svg += '</svg>';
+  var legend = "";
+  if(series.length>1){
+    legend = '<div class="chart-legend">' + series.map(function(s){
+      return '<span class="legend-item"><span class="legend-dot" style="background:'+s.color+'"></span>'+esc(s.name)+'</span>';
+    }).join("") + '</div>';
+  }
+  container.innerHTML = legend + svg + '<div class="chart-tooltip" style="display:none"></div>';
+
+  var svgEl = container.querySelector("svg");
+  var tooltip = container.querySelector(".chart-tooltip");
+  var hitLayer = document.createElementNS("http://www.w3.org/2000/svg","rect");
+  hitLayer.setAttribute("x", padL); hitLayer.setAttribute("y", padT);
+  hitLayer.setAttribute("width", innerW); hitLayer.setAttribute("height", innerH);
+  hitLayer.setAttribute("fill","transparent");
+  svgEl.appendChild(hitLayer);
+  var crosshair = document.createElementNS("http://www.w3.org/2000/svg","line");
+  crosshair.setAttribute("class","crosshair-line"); crosshair.setAttribute("y1",padT); crosshair.setAttribute("y2",padT+innerH);
+  crosshair.style.display="none";
+  svgEl.appendChild(crosshair);
+
+  function onMove(evt){
+    var rect = svgEl.getBoundingClientRect();
+    var mx = (evt.clientX-rect.left) * (W/rect.width);
+    var idx = Math.round(((mx-padL)/innerW)*(n-1));
+    idx = Math.max(0, Math.min(n-1, idx));
+    var cx = x(idx);
+    crosshair.setAttribute("x1",cx); crosshair.setAttribute("x2",cx); crosshair.style.display="block";
+    tooltip.style.display="block";
+    tooltip.style.left = (rect.left - container.getBoundingClientRect().left + cx*(rect.width/W)) + "px";
+    tooltip.style.top = "6px";
+    var lines = series.map(function(s){ return s.name+": "+(opts.valueFmt?opts.valueFmt(s.values[idx]):s.values[idx]); });
+    tooltip.innerHTML = "<b>"+fmtDateShort(dates[idx])+"</b><br>"+lines.join("<br>");
+  }
+  svgEl.addEventListener("mousemove", onMove);
+  svgEl.addEventListener("mouseleave", function(){ crosshair.style.display="none"; tooltip.style.display="none"; });
+  svgEl.addEventListener("touchstart", function(e){ onMove(e.touches[0]); }, {passive:true});
+  svgEl.addEventListener("touchmove", function(e){ onMove(e.touches[0]); }, {passive:true});
+}
+
+function fmtDateShort(iso){ var p=iso.split("-"); return p[2]+"/"+p[1]+"/"+p[0].slice(2); }
+
+/* ---------------- gráfico de barras de sazonalidade (índice vs. 100=média) ----------------
+   Cada bucket = {label, shortLabel, index, n}. "index" null/"n"===0 = sem
+   dado (barra vazia, cinza). Barra colorida por polaridade em torno de 100
+   (acima=bom, abaixo=crítico) — a mesma paleta de status usada no resto do
+   painel (badges de tendência etc.), não uma paleta nova. Barras com poucos
+   dias no histórico (< opts.minN) ficam com opacidade reduzida e avisam no
+   tooltip, em vez de esconder o dado. */
+function drawSeasonalityBars(container, buckets, opts){
+  opts = opts || {};
+  var minN = opts.minN || 10;
+  var W = Math.max(280, container.clientWidth || 560), H = opts.height || 230;
+  var padL = 34, padR = 14, padT = 20, padB = 40;
+  var innerW = W - padL - padR, innerH = H - padT - padB;
+  var vals = buckets.map(function(b){ return (b.index==null) ? 100 : b.index; });
+  // a escala foca no desvio real em volta de 100 (não força o eixo até 0),
+  // senão desvios pequenos (comuns em sazonalidade diária, tipo 79–114)
+  // viram barrinhas quase invisíveis num eixo gigante de 0 a 130.
+  var maxV = Math.max(Math.max.apply(null, vals), 100);
+  var minV = Math.min(Math.min.apply(null, vals), 100);
+  var span = Math.max(8, maxV - minV);
+  maxV += span * 0.28; minV -= span * 0.28;
+  if(minV < 0) minV = 0;
+  if(maxV <= minV) maxV = minV + 10;
+  function y(v){ return padT + innerH - ((v - minV) / (maxV - minV)) * innerH; }
+  var n = buckets.length;
+  var gap = n > 8 ? 6 : 12;
+  var bw = Math.max(6, (innerW - gap * (n - 1)) / n);
+  var y0 = y(100);
+
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" style="display:block;overflow:visible">';
+  svg += '<line x1="'+padL+'" x2="'+(W-padR)+'" y1="'+y0+'" y2="'+y0+'" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3 3"/>';
+  svg += '<text x="'+padL+'" y="'+(y0-6)+'" font-size="9.5" fill="var(--text-muted)">média histórica = 100</text>';
+
+  buckets.forEach(function(b, i){
+    var bx = padL + i * (bw + gap);
+    var hasData = b.index != null && b.n > 0;
+    var v = hasData ? b.index : 100;
+    var by = y(v);
+    var top = Math.min(by, y0), h = Math.max(hasData ? 2 : 0, Math.abs(by - y0));
+    var low = hasData && b.n < minN;
+    var tone = !hasData ? "var(--border)" : (v >= 110 ? "var(--good)" : (v <= 90 ? "var(--critical)" : "var(--accent)"));
+    var op = !hasData ? 0.4 : (low ? 0.55 : 0.92);
+    svg += '<rect class="season-bar" data-i="'+i+'" x="'+bx+'" y="'+top+'" width="'+bw+'" height="'+h+'" rx="4" fill="'+tone+'" opacity="'+op+'"/>';
+    if(low){
+      svg += '<rect x="'+bx+'" y="'+top+'" width="'+bw+'" height="'+h+'" rx="4" fill="none" stroke="'+tone+'" stroke-width="1" stroke-dasharray="2 2" opacity="0.9"/>';
+    }
+    var labelY;
+    if(hasData){
+      labelY = (by - 7 < padT + 9) ? (by + 13) : (by - 7);
+      svg += '<text x="'+(bx+bw/2)+'" y="'+labelY+'" font-size="10.5" text-anchor="middle" font-weight="700" fill="var(--text-primary)">'+Math.round(v)+'</text>';
+    } else {
+      svg += '<text x="'+(bx+bw/2)+'" y="'+(y0-8)+'" font-size="9.5" text-anchor="middle" fill="var(--text-muted)">—</text>';
+    }
+    svg += '<text x="'+(bx+bw/2)+'" y="'+(H-12)+'" font-size="'+(n>7?9:10.5)+'" text-anchor="middle" fill="var(--text-secondary)">'+esc(b.shortLabel||b.label)+'</text>';
+    if(low && hasData){
+      svg += '<text x="'+(bx+bw/2)+'" y="'+(H-2)+'" font-size="8" text-anchor="middle" fill="var(--warning)">amostra baixa</text>';
+    }
+  });
+  svg += '</svg>';
+  container.innerHTML = svg + '<div class="chart-tooltip" style="display:none"></div>';
+
+  var svgEl = container.querySelector("svg");
+  var tooltip = container.querySelector(".chart-tooltip");
+  svgEl.querySelectorAll(".season-bar").forEach(function(rect){
+    rect.style.cursor = "pointer";
+    function show(evt){
+      var i = parseInt(rect.getAttribute("data-i"), 10);
+      var b = buckets[i];
+      var contBB = container.getBoundingClientRect();
+      var cx = evt.touches ? evt.touches[0].clientX : evt.clientX;
+      tooltip.style.display = "block";
+      tooltip.style.left = Math.max(4, cx - contBB.left) + "px";
+      tooltip.style.top = "6px";
+      var body = (b.index==null || b.n===0)
+        ? "Sem dado suficiente nesse período do histórico."
+        : (b.index + "% da média histórica diária desse item — " + b.n + " dia" + (b.n===1?"":"s") + " de histórico nesse recorte" + (b.n<minN ? " (amostra pequena, leia com cautela)" : "") + ".");
+      tooltip.innerHTML = "<b>"+esc(b.label)+"</b><br>"+body;
+    }
+    rect.addEventListener("mousemove", show);
+    rect.addEventListener("mouseleave", function(){ tooltip.style.display="none"; });
+    rect.addEventListener("touchstart", show, {passive:true});
+  });
+}
+
+/* micro-sparkline sem interação (a linha vira interativa ao abrir o detalhe) */
+function sparkSvg(values, color, w, h){
+  w=w||88; h=h||26;
+  var max=Math.max.apply(null, values.concat([0])), min=Math.min.apply(null, values.concat([0]));
+  if(max===min) max=min+1;
+  var n=values.length;
+  var pts = values.map(function(v,i){
+    var px = n<=1?0:(i/(n-1))*w;
+    var py = h - ((v-min)/(max-min))*h;
+    return px.toFixed(1)+","+py.toFixed(1);
+  }).join(" ");
+  return '<svg viewBox="0 0 '+w+' '+h+'" width="'+w+'" height="'+h+'" preserveAspectRatio="none">'+
+    '<polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+}
+
+/* ---------------- quadro de oportunidades ---------------- */
+function skuSellsInStore(s, store){
+  if(s.top_store===store) return true;
+  return (s.store_breakdown||[]).some(function(b){ return b.store===store; });
+}
+function boardMetrics(s, monthKey, isCurrent){
+  if(isCurrent){
+    return {
+      trend: s.trend_label, chg: s.period_change_pct, gap: s.last_sale_gap_days,
+      isStale: s.opportunity_flags.indexOf("parado_ha_30d_ou_mais")>=0 && s.last_sale_gap_days!=null
+    };
+  }
+  var m = (s.monthly_board||[]).filter(function(x){ return x.m===monthKey; })[0];
+  if(!m) return null;
+  return {trend: m.trend, chg: m.chg, gap: m.gap, isStale: m.gap!=null && m.gap>=30};
+}
+function renderBoard(skus){
+  var storeF = STATE.boardStoreFilter;
+  var from = STATE.boardDateFrom, to = STATE.boardDateTo;
+  var months = (STATE.data && STATE.data.overview.board_months) || [];
+  var latestKey = months.length ? months[months.length-1].key : "";
+  var monthKey = STATE.boardMonth || latestKey;
+  var isCurrent = !STATE.boardMonth || STATE.boardMonth===latestKey;
+
+  var hint = document.getElementById("board-month-hint");
+  if(hint){
+    hint.textContent = isCurrent
+      ? "Mostrando o instantâneo de agora (variação nos últimos 30 dias, mais preciso que o mês fechado)."
+      : "Mostrando como o quadro estaria no fim de "+(months.filter(function(m){return m.key===monthKey;})[0]||{}).label+" — tendência calculada com mês fechado vs. mês anterior. O estoque mostrado é sempre o ATUAL (não existe histórico de estoque salvo por mês).";
+  }
+
+  var pool = skus.filter(function(s){
+    if(storeF && !skuSellsInStore(s, storeF)) return false;
+    if(from && s.last_seen < from) return false;
+    if(to && s.last_seen > to) return false;
+    return true;
+  }).map(function(s){
+    return {s:s, m: boardMetrics(s, monthKey, isCurrent)};
+  }).filter(function(x){ return x.m; });
+  STATE.boardPool = pool.map(function(x){ return x.s; }); // pra exportação
+
+  var accel = pool.filter(function(x){ return x.m.trend==="acelerando"; })
+    .sort(function(a,b){ return (b.m.chg||0)-(a.m.chg||0); });
+  var decel = pool.filter(function(x){ return x.m.trend==="desacelerando"; })
+    .sort(function(a,b){ return (a.m.chg||0)-(b.m.chg||0); });
+  var stale = pool.filter(function(x){ return x.m.isStale; })
+    .sort(function(a,b){ return b.s.total_sales-a.s.total_sales; });
+  var staleStock = pool.filter(function(x){
+    return x.m.isStale && x.s.estoque && x.s.estoque.saldo_atual!=null && x.s.estoque.saldo_atual>0;
+  }).sort(function(a,b){ return (b.s.estoque.saldo_atual)-(a.s.estoque.saldo_atual); });
+
+  document.getElementById("count-accel").textContent = accel.length;
+  document.getElementById("count-decel").textContent = decel.length;
+  document.getElementById("count-stale").textContent = stale.length;
+  document.getElementById("count-stale-stock").textContent = staleStock.length;
+
+  function stockSub(x){
+    return x.s.estoque && x.s.estoque.saldo_atual!=null ? "Estoque atual: "+fmtInt(x.s.estoque.saldo_atual)+" un." : "Estoque: —";
+  }
+  function streakSub(x){
+    var st = trendStreak(x.s);
+    var base = stockSub(x);
+    if(st.count<1) return base;
+    var arrow = (st.dir==="down"?"▼":"▲").repeat(st.count);
+    var verb = st.dir==="down" ? "caindo" : "subindo";
+    return base + " · " + arrow + " " + verb + " há " + st.count + (st.count===1?" mês":" meses");
+  }
+  fillLane("lane-accel", accel, function(x){ return fmtPct(x.m.chg); }, streakSub, function(x){return x.s;});
+  fillLane("lane-decel", decel, function(x){ return fmtPct(x.m.chg); }, streakSub, function(x){return x.s;});
+  fillLane("lane-stale", stale, function(x){ return x.m.gap+"d parado"; }, stockSub, function(x){return x.s;});
+  fillLane("lane-stale-stock", staleStock, function(x){ return x.m.gap+"d parado"; },
+    function(x){ return "Estoque atual: "+fmtInt(x.s.estoque.saldo_atual)+" un."; }, function(x){return x.s;});
+}
+function renderBoardMonthTabs(){
+  var months = (STATE.data && STATE.data.overview.board_months) || [];
+  var latestKey = months.length ? months[months.length-1].key : "";
+  var el = document.getElementById("board-month-tabs");
+  if(!el) return;
+  el.innerHTML = months.map(function(mp){
+    var active = (STATE.boardMonth ? STATE.boardMonth===mp.key : mp.key===latestKey);
+    return '<button data-month="'+esc(mp.key)+'"'+(active?' class="active"':'')+'>'+esc(mp.label.replace(" (parcial)"," · agora"))+'</button>';
+  }).join("");
+  el.querySelectorAll("button").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      el.querySelectorAll("button").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      STATE.boardMonth = btn.getAttribute("data-month");
+      renderBoard(STATE.data.skus);
+    });
+  });
+}
+function fillLane(id, list, valFn, subFn, skuFn){
+  var el = document.getElementById(id);
+  if(!list.length){ el.innerHTML = '<div class="op-empty">Nada aqui no momento.</div>'; return; }
+  el.innerHTML = list.map(function(x){
+    var s = skuFn ? skuFn(x) : x;
+    return '<div class="op-item" data-sku="'+esc(s.sku)+'"><div><div class="nm" title="'+esc(s.name)+'">'+esc(s.name)+'</div>'+
+      '<div class="sub">'+esc(s.sku)+'</div>'+(subFn?'<div class="sub">'+esc(subFn(x))+'</div>':'')+'</div><div class="val tabular">'+valFn(x)+'</div></div>';
+  }).join("");
+  el.querySelectorAll(".op-item").forEach(function(node){
+    node.addEventListener("click", function(){ openDrawer(node.getAttribute("data-sku")); });
+  });
+}
+
+/* ---------------- filtro de loja ---------------- */
+function populateStoreFilter(skus){
+  var set = {};
+  skus.forEach(function(s){ if(s.top_store) set[s.top_store]=true; });
+  var stores = Object.keys(set).sort();
+  ["store-filter","board-store-filter"].forEach(function(id){
+    var sel = document.getElementById(id);
+    if(!sel) return;
+    stores.forEach(function(store){
+      var opt = document.createElement("option"); opt.value=store; opt.textContent=store; sel.appendChild(opt);
+    });
+  });
+}
+
+/* ---------------- estoque & projeção de esgotamento ---------------- */
+function renderStockCarousel(skus){
+  var withStock = skus.filter(function(s){ return s.estoque; });
+  var el = document.getElementById("stock-carousel");
+  var info = STATE.data.overview.stock_info;
+  var noteEl = document.getElementById("stock-section-note");
+  if(!info){
+    noteEl.innerHTML = "Nenhum relatório de estoque importado ainda — anexe um na conversa e peça pra eu atualizar (aba \"Atualizar Dados\").";
+  } else {
+    var exact = info.matched_active_items_exact||0;
+    var shared = info.matched_active_items_shared||0;
+    var activeTotal = info.matched_active_items||0;
+    var baseNote = "Referência: "+esc(info.as_of_label)+" · "+fmtInt(info.total_saldo_atual)+" un. no total do relatório de estoque (inclui itens sem correspondência de SKU) · "+activeTotal+" SKU(s) ativos (venda ≤90d) com estoque.";
+    if(activeTotal === 0){
+      baseNote += ' <span class="delta down" style="font-weight:700">⚠ Nenhum SKU ativo com estoque casado</span> — o relatório de estoque usa um código por modelo (ex.: "129-3709-110V"), diferente do SKU por lote/variação usado nas vendas (ex.: "3709-01-110V").';
+    } else if(shared > 0){
+      baseNote += ' <span class="tag warning" style="font-weight:600">~ estimado</span> '+shared+' desse(s) SKU(s) foram casados por <b>modelo</b> (código de estoque sem o lote) — o saldo mostrado é o saldo do modelo inteiro, <b>compartilhado</b> entre todas as variações/lotes daquele modelo que ainda vendem, então pode estar superestimado por variação individual.'+
+        (exact>0 ? ' '+exact+' SKU(s) casaram por código exato (saldo individual confiável).' : '');
+    } else {
+      baseNote += ' Todos casados por código exato de SKU.';
+    }
+    noteEl.innerHTML = baseNote;
+  }
+  if(!withStock.length){
+    el.innerHTML = '<div class="stock-empty">Sem SKUs com estoque casado ainda.</div>';
+    return;
+  }
+  withStock.sort(function(a,b){
+    var da = a.estoque.dias_restantes, db = b.estoque.dias_restantes;
+    if(da==null && db==null) return 0;
+    if(da==null) return 1;
+    if(db==null) return -1;
+    return da-db;
+  });
+  el.innerHTML = withStock.map(function(s){
+    var e = s.estoque;
+    var diasHtml, tone;
+    if(e.dias_restantes==null){
+      diasHtml = e.giro_baixo ? "giro muito baixo" : "sem giro recente";
+      tone = "var(--text-muted)";
+    } else if(e.dias_restantes<=14){
+      diasHtml = e.dias_restantes+" dias"; tone = "var(--critical)";
+    } else if(e.dias_restantes<=30){
+      diasHtml = e.dias_restantes+" dias"; tone = "var(--warning)";
+    } else {
+      diasHtml = Math.round(e.dias_restantes)+" dias"; tone = "var(--good)";
+    }
+    var sharedBadge = e.compartilhado ? ' <span class="tag warning" title="Saldo do modelo, compartilhado entre as variações/lotes ativos — pode estar superestimado para este SKU específico">~ estimado</span>' : '';
+    return '<div class="stock-card" data-sku="'+esc(s.sku)+'">'+
+      '<div class="nm" title="'+esc(s.name)+'">'+esc(s.name)+'</div>'+
+      '<div class="sub">'+esc(s.sku)+sharedBadge+'</div>'+
+      '<div class="qty-row"><strong class="tabular">'+fmtInt(e.saldo_atual)+'</strong><small>em estoque'+(e.compartilhado?' (compartilhado)':'')+'</small></div>'+
+      '<div class="qty-row"><strong class="tabular" style="color:'+tone+';font-size:14px">'+diasHtml+'</strong><small>'+(e.previsao_esgota? "até "+fmtDate(e.previsao_esgota) : "restantes")+'</small></div>'+
+      '<div class="section-note" style="margin-top:2px">Ritmo recente: '+e.taxa_diaria_sma7+' un/dia (SMA7)</div>'+
+      '</div>';
+  }).join("");
+  el.querySelectorAll(".stock-card").forEach(function(node){
+    node.addEventListener("click", function(){ openDrawer(node.getAttribute("data-sku")); });
+  });
+}
+
+function renderStockTab(){
+  if(STATE.stockTableWired) return;
+  STATE.stockTableWired = true;
+  var rows = (STATE.data.overview.stock_rows)||[];
+  var currentList = rows;
+  function draw(){
+    var q = document.getElementById("stock-search-input").value.trim().toLowerCase();
+    var onlyMatched = document.getElementById("stock-only-matched").checked;
+    var list = rows.filter(function(r){
+      if(onlyMatched && !r.matched_sku) return false;
+      if(q && r.codigo.toLowerCase().indexOf(q)<0 && (r.produto||"").toLowerCase().indexOf(q)<0) return false;
+      return true;
+    });
+    currentList = list;
+    var tbody = document.getElementById("stock-tbody");
+    if(!list.length){
+      tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">Nenhum item encontrado.</div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(function(r){
+      return '<tr'+(r.matched_sku?' data-sku="'+esc(r.matched_sku)+'" style="cursor:pointer"':'')+'>'+
+        '<td class="sku-code">'+esc(r.codigo)+'</td>'+
+        '<td>'+esc(r.produto||"—")+'</td>'+
+        '<td>'+(r.matched_sku ? '<span class="badge good">'+esc(r.matched_sku)+'</span>' : '<span class="badge neutral">sem correspondência</span>')+'</td>'+
+        '<td class="num tabular">'+fmtInt(r.entradas_qtd)+'</td>'+
+        '<td class="num tabular">'+fmtInt(r.saidas_qtd)+'</td>'+
+        '<td class="num tabular">'+fmtInt(r.saldo_atual)+'</td>'+
+        '</tr>';
+    }).join("");
+    tbody.querySelectorAll("tr[data-sku]").forEach(function(row){
+      row.addEventListener("click", function(){ openDrawer(row.getAttribute("data-sku")); });
+    });
+  }
+  document.getElementById("stock-search-input").addEventListener("input", debounce(draw, 150));
+  document.getElementById("stock-only-matched").addEventListener("change", draw);
+  document.getElementById("stock-export-btn").addEventListener("click", function(){
+    var header = ["Codigo_estoque","Produto","SKU_de_vendas","Entradas_periodo","Saidas_periodo","Saldo_atual"];
+    var out = currentList.map(function(r){
+      return [r.codigo, r.produto||"", r.matched_sku||"", r.entradas_qtd==null?"":r.entradas_qtd, r.saidas_qtd==null?"":r.saidas_qtd, r.saldo_atual==null?"":r.saldo_atual];
+    });
+    exportRowsAsCsv("estoque", header, out, "stock-export-btn");
+  });
+  draw();
+}
+
+/* ---------------- calendário de vendas projetado ---------------- */
+function initCalendar(json){
+  var ov = json.overview;
+  var stores = Object.keys(ov.weekday_top||{}).filter(function(s){ return s!=="__ALL__"; }).sort();
+  var sel = document.getElementById("calendar-store-filter");
+  stores.forEach(function(store){
+    var opt = document.createElement("option"); opt.value=store; opt.textContent=store; sel.appendChild(opt);
+  });
+
+  var start = new Date(ov.data_through+"T00:00:00");
+  start.setDate(start.getDate()+1); // a partir do dia seguinte ao fim dos dados
+  var days = [];
+  for(var i=0;i<45;i++){
+    var d = new Date(start); d.setDate(start.getDate()+i);
+    days.push(d);
+  }
+  var dowLabels = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  var monLabels = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  function jsDowToDataDow(jsDow){ return (jsDow+6)%7; } // JS: 0=domingo -> nosso 0=segunda
+
+  var cal = document.getElementById("calendar-carousel");
+  cal.innerHTML = days.map(function(d,i){
+    var dow = jsDowToDataDow(d.getDay());
+    return '<div class="day-card'+(i===0?" active":"")+'" data-idx="'+i+'" data-dow="'+dow+'">'+
+      '<div class="dow">'+dowLabels[dow]+'</div><div class="dnum">'+d.getDate()+'</div><div class="mon">'+monLabels[d.getMonth()]+'</div></div>';
+  }).join("");
+
+  // Chance do SKU vender NESSE dia específico: parte da taxa média
+  // histórica do dia-da-semana dentro daquele mês (bucket.avg_qty, já
+  // calculado no servidor) como "lambda" de uma distribuição de Poisson —
+  // P(vender pelo menos 1 unidade) = 1 - e^(-lambda) é a fórmula padrão
+  // pra "qual a chance de pelo menos um evento acontecer, dada uma taxa
+  // média". Esse lambda é ajustado pelo Score de Oportunidade do SKU
+  // (que já embute momentum, RSI, volume, estatística, Fibonacci e os
+  // padrões calculados) — score 50 é neutro (não muda nada), score 100
+  // dobra a chance, score 0 zera. É uma heurística, não uma previsão
+  // validada — por isso a exportação em CSV existe, pra dar pra
+  // fazer backtesting por fora.
+  function calendarChance(avgQty, score){
+    var s = score==null ? 50 : score;
+    var lambda = avgQty * (s/50);
+    var p = 1 - Math.exp(-lambda);
+    return Math.max(0, Math.min(99, p*100));
+  }
+
+  function showResultsFor(dow, dateObj){
+    var storeSel = document.getElementById("calendar-store-filter").value || "__ALL__";
+    var month = (dateObj || days[0]).getMonth()+1;
+    var storeTable = ov.weekday_top[storeSel] || ov.weekday_top["__ALL__"] || {};
+    var rawBucket = ((storeTable[String(month)] || {})[String(dow)]) || [];
+    var box = document.getElementById("calendar-results");
+    var dowLabels2 = ["segunda","terça","quarta","quinta","sexta","sábado","domingo"];
+    var monthLabelsFull = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+    var title = 'SKUs que mais costumam vender numa <b>'+dowLabels2[dow]+'</b> de <b>'+monthLabelsFull[month-1]+'</b>'+(storeSel!=="__ALL__" ? ' em <b>'+esc(storeSel)+'</b>' : ' (todos os marketplaces)')+
+      (dateObj ? ' — referência: '+dateObj.toLocaleDateString("pt-BR") : '')+
+      ' <span class="section-note">(padrão sazonal do mês + tendência 60d, ajustado pelo Score de cada SKU — ordenado por chance)</span>';
+    if(!rawBucket.length){
+      box.innerHTML = '<div class="section-note">'+title+'</div><div class="stock-empty">Sem histórico suficiente pra esse recorte.</div>';
+      return;
+    }
+    var bucket = rawBucket.map(function(it){
+      var s = findSku(it.sku);
+      var score = s ? s.score : null;
+      return { sku: it.sku, avg_qty: it.avg_qty, lift: it.lift, score: score, chance: calendarChance(it.avg_qty, score) };
+    }).sort(function(a,b){ return b.chance-a.chance; });
+    var nameMap = STATE.skuNameMap || (STATE.skuNameMap = (function(){
+      var m={}; STATE.data.skus.forEach(function(s){ m[s.sku]=s.name; }); return m;
+    })());
+    STATE.calendarCurrent = { bucket: bucket, dow: dow, month: month, storeSel: storeSel, dowLabel: dowLabels2[dow], monthLabel: monthLabelsFull[month-1] };
+    box.innerHTML = '<div class="section-note" style="margin-bottom:8px">'+title+'</div>' +
+      bucket.map(function(it,idx){
+        var chanceTone = it.chance>=60 ? "var(--good)" : (it.chance>=30 ? "var(--warning)" : "var(--critical)");
+        var liftHtml = it.lift!=null ? ' · <b>'+it.lift.toFixed(1)+'x</b> o normal desse SKU' : '';
+        return '<div class="calendar-item" data-sku="'+esc(it.sku)+'" style="cursor:pointer"><span class="rank">'+(idx+1)+'</span>'+
+          '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px">'+esc(nameMap[it.sku]||it.sku)+' <span class="sku-code">'+esc(it.sku)+'</span></span>'+
+          '<span class="tabular" style="font-weight:800;color:'+chanceTone+';margin-right:10px">'+it.chance.toFixed(0)+'% chance</span>'+
+          '<span class="tabular section-note">'+it.avg_qty+' un/dia (média)'+liftHtml+' · score '+(it.score!=null?it.score.toFixed(0):'—')+'</span></div>';
+      }).join("");
+    box.querySelectorAll(".calendar-item").forEach(function(node){
+      node.addEventListener("click", function(){ openDrawer(node.getAttribute("data-sku")); });
+    });
+  }
+
+  cal.querySelectorAll(".day-card").forEach(function(node){
+    node.addEventListener("click", function(){
+      cal.querySelectorAll(".day-card").forEach(function(n){ n.classList.remove("active"); });
+      node.classList.add("active");
+      showResultsFor(parseInt(node.getAttribute("data-dow"),10), days[parseInt(node.getAttribute("data-idx"),10)]);
+    });
+  });
+  document.getElementById("calendar-store-filter").addEventListener("change", function(){
+    var activeCard = cal.querySelector(".day-card.active") || cal.querySelector(".day-card");
+    if(activeCard) showResultsFor(parseInt(activeCard.getAttribute("data-dow"),10), days[parseInt(activeCard.getAttribute("data-idx"),10)]);
+  });
+
+  document.getElementById("calendar-export-btn").addEventListener("click", function(){
+    var cur = STATE.calendarCurrent;
+    if(!cur || !cur.bucket.length) return;
+    var nameMap = STATE.skuNameMap || (STATE.skuNameMap = (function(){
+      var m={}; STATE.data.skus.forEach(function(s){ m[s.sku]=s.name; }); return m;
+    })());
+    var header = ["SKU","Produto","Chance_pct","Lift_vs_normal_do_sku","Score_Oportunidade","Media_qtd_dia","Dia_da_semana","Mes","Marketplace"];
+    var rows = cur.bucket.map(function(it){
+      return [it.sku, nameMap[it.sku]||"", it.chance.toFixed(1), it.lift==null?"":it.lift, it.score==null?"":it.score, it.avg_qty, cur.dowLabel, cur.monthLabel, cur.storeSel];
+    });
+    exportRowsAsCsv("calendario_"+cur.monthLabel+"_"+cur.dowLabel, header, rows, "calendar-export-btn");
+  });
+
+  showResultsFor(jsDowToDataDow(days[0].getDay()), days[0]);
+}
+
+/* ---------------- marketing (fatos dos dados + práticas gerais) ---------------- */
+var DOW_NAMES = ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
+/* ---------------- Comparativo de itens (aba Marketing) ----------------
+   Até 4 SKUs ao mesmo tempo, cada um com uma cor categórica fixa (nunca
+   sorteada/ciclada) — reusa a MESMA série diária regularizada de 365 dias
+   do Gráfico Interativo (GF.ensureSeries), carregada uma vez só mesmo que
+   o usuário visite as duas abas. */
+var MCMP_COLOR_VARS = ["var(--accent)","var(--series-2)","var(--series-3)","var(--series-4)"];
+var MCMP_MAX = MCMP_COLOR_VARS.length;
+var mcmpSeries = null;      // series_365d.json, carregado via GF.ensureSeries
+var mcmpSkuList = null;     // [{sku,name}], ordenado por faturamento total
+var mcmpSel = [];           // skus escolhidos, na ordem de adição (define a cor)
+var mcmpRange = "180";
+
+function initMarketingCompare(){
+  if(!STATE.data) return;
+  mcmpSkuList = STATE.data.skus.slice()
+    .sort(function(a,b){ return (b.total_sales||0)-(a.total_sales||0); })
+    .map(function(s){ return {sku:s.sku, name:s.name}; });
+  mcmpSel = mcmpSkuList.slice(0, MCMP_MAX).map(function(it){ return it.sku; });
+  populateMcmpAddSelect();
+
+  document.getElementById("mcmp-search").addEventListener("input", debounce(function(e){
+    var q = e.target.value.trim().toLowerCase();
+    var filtered = !q ? mcmpSkuList : mcmpSkuList.filter(function(it){
+      return it.name.toLowerCase().indexOf(q)>=0 || it.sku.toLowerCase().indexOf(q)>=0;
+    });
+    populateMcmpAddSelect(filtered);
+  }, 180));
+  document.getElementById("mcmp-add-select").addEventListener("change", function(e){
+    var sku = e.target.value;
+    if(!sku) return;
+    if(mcmpSel.indexOf(sku)<0 && mcmpSel.length<MCMP_MAX) mcmpSel.push(sku);
+    e.target.value = "";
+    renderMcmpChips();
+    renderMcmpChart();
+  });
+  document.getElementById("mcmp-metric").addEventListener("change", renderMcmpChart);
+  document.getElementById("mcmp-smooth").addEventListener("change", renderMcmpChart);
+  document.getElementById("mcmp-normalize").addEventListener("change", renderMcmpChart);
+  document.querySelectorAll("#mcmp-range-tabs button").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll("#mcmp-range-tabs button").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      mcmpRange = btn.getAttribute("data-range");
+      renderMcmpChart();
+    });
+  });
+  window.addEventListener("resize", debounce(function(){
+    if(!document.getElementById("tab-marketing").hidden) renderMcmpChart();
+  }, 220));
+
+  renderMcmpChips();
+  GF.ensureSeries(function(series){
+    mcmpSeries = series;
+    document.getElementById("mcmp-loading").hidden = true;
+    document.getElementById("mcmp-chart-card").hidden = false;
+    renderMcmpChart();
+  });
+}
+function populateMcmpAddSelect(list){
+  list = list || mcmpSkuList;
+  var sel = document.getElementById("mcmp-add-select");
+  sel.innerHTML = '<option value="">+ Adicionar item ao comparativo…</option>' +
+    list.slice(0,4000).map(function(it){
+      var already = mcmpSel.indexOf(it.sku)>=0;
+      return '<option value="'+esc(it.sku)+'"'+(already?' disabled':'')+'>'+(already?"✓ ":"")+esc(it.name)+' — '+esc(it.sku)+'</option>';
+    }).join("");
+}
+function mcmpColorOf(sku){
+  var i = mcmpSel.indexOf(sku);
+  return i>=0 ? MCMP_COLOR_VARS[i] : "var(--text-muted)";
+}
+function renderMcmpChips(){
+  var el = document.getElementById("mcmp-chips");
+  if(!mcmpSel.length){ el.innerHTML = '<div class="chip-row-empty">Nenhum item selecionado — adicione pela busca acima.</div>'; return; }
+  el.innerHTML = mcmpSel.map(function(sku){
+    var it = mcmpSkuList.filter(function(x){ return x.sku===sku; })[0];
+    var name = it ? it.name : sku;
+    return '<span class="sel-chip" style="--c:'+mcmpColorOf(sku)+'"><span class="dot"></span>'+esc(name.length>28?name.slice(0,28)+"…":name)+
+      '<button type="button" data-remove-sku="'+esc(sku)+'" title="Remover">✕</button></span>';
+  }).join("");
+  el.querySelectorAll("[data-remove-sku]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var sku = btn.getAttribute("data-remove-sku");
+      mcmpSel = mcmpSel.filter(function(s){ return s!==sku; });
+      renderMcmpChips();
+      populateMcmpAddSelect();
+      renderMcmpChart();
+    });
+  });
+  populateMcmpAddSelect();
+}
+/* SMA com janela parcial no início (min_periods=1), mesma semântica do
+   sma() em Python server-side — não deixa os primeiros dias em branco. */
+function smaWindowArr(arr, window){
+  var out = new Array(arr.length);
+  var sum = 0;
+  for(var i=0;i<arr.length;i++){
+    sum += arr[i];
+    if(i>=window) sum -= arr[i-window];
+    out[i] = sum / Math.min(i+1, window);
+  }
+  return out;
+}
+function renderMcmpChart(){
+  var el = document.getElementById("mcmp-chart");
+  if(!mcmpSeries || !mcmpSel.length){
+    el.innerHTML = '<div class="empty-state">Adicione pelo menos um item pra comparar.</div>';
+    return;
+  }
+  var metric = document.getElementById("mcmp-metric").value; // "q" | "r"
+  var smooth = document.getElementById("mcmp-smooth").checked;
+  var normalize = document.getElementById("mcmp-normalize").checked;
+
+  // eixo de datas compartilhado: últimos 365 dias corridos até a data mais
+  // recente do dataset (mesmo tamanho máximo usado por SKU no series_365d.json),
+  // depois recortado pela janela escolhida (30/90/180/365/tudo=365).
+  var ov = STATE.data.overview;
+  var masterDates = (ov.company_daily_dates || []).slice(-365);
+  var n = mcmpRange==="all" ? masterDates.length : Math.min(masterDates.length, parseInt(mcmpRange,10));
+  var dates = masterDates.slice(-n);
+
+  var series = mcmpSel.map(function(sku, idx){
+    var rec = mcmpSeries[sku];
+    var name = (mcmpSkuList.filter(function(x){return x.sku===sku;})[0]||{}).name || sku;
+    var byDate = {};
+    if(rec) rec.d.forEach(function(d,i){ byDate[d] = metric==="q" ? rec.q[i] : rec.r[i]; });
+    var vals = dates.map(function(d){ return byDate.hasOwnProperty(d) ? byDate[d] : 0; });
+    if(smooth) vals = smaWindowArr(vals, 7);
+    if(normalize){
+      var base = vals[0];
+      vals = (base && base>0) ? vals.map(function(v){ return (v/base)*100; }) : vals.map(function(){ return 100; });
+    }
+    return {name:name, values:vals, color:MCMP_COLOR_VARS[idx]};
+  });
+
+  var valueFmt = normalize
+    ? function(v){ return v.toFixed(0)+"%"; }
+    : (metric==="r" ? function(v){ return fmtBRLShort(v); } : function(v){ return fmtInt(Math.round(v)); });
+  drawLineChart(el, dates, series, {height:480, valueFmt: valueFmt});
+}
+
+function renderMarketingTab(){
+  if(STATE.marketingTabWired) return;
+  STATE.marketingTabWired = true;
+  initMarketingCompare();
+  var mf = STATE.data.overview.marketing_facts;
+  if(!mf){
+    document.getElementById("marketing-data-cards").innerHTML = '<div class="stock-empty">Sem dados suficientes ainda.</div>';
+  } else {
+    var cards = [];
+    cards.push(dataCard("📅 Melhor dia da semana (histórico)",
+      "<b>"+DOW_NAMES[mf.best_weekday.dow]+"</b> é o dia com maior média de vendas — "+mf.best_weekday.avg_qty+" un/dia em média, somando todos os canais.",
+      "Considere concentrar início de promoções, disparo de e-mail/WhatsApp e ativação de anúncios pagos perto desse dia."));
+    if(mf.top_store){
+      cards.push(dataCard("🏪 Canal mais forte",
+        "<b>"+esc(mf.top_store.store)+"</b> responde por "+mf.top_store.share_pct+"% do faturamento total.",
+        "Vale concentrar orçamento de anúncio patrocinado e testar promoções primeiro nesse canal antes de replicar nos outros."));
+    }
+    if(mf.top_revenue && mf.top_revenue.length){
+      cards.push(dataCard("🏆 Best-sellers (maior faturamento total)",
+        listHtml(mf.top_revenue, function(r){ return esc(r.name); }),
+        "Bons candidatos a produto-isca em anúncios e a compor kits/combos com itens de menor giro."));
+    }
+    if(mf.top_accelerating && mf.top_accelerating.length){
+      cards.push(dataCard("🚀 Acelerando agora",
+        listHtml(mf.top_accelerating, function(r){ return esc(r.name)+" ("+fmtPct(r.period_change_pct)+")"; }),
+        "Demanda subindo — considere reforçar estoque e dar mais visibilidade (anúncio, posição no catálogo) enquanto o momentum dura."));
+    }
+    if(mf.clearance_candidates && mf.clearance_candidates.length){
+      cards.push(dataCard("📦 Candidatos a liquidação",
+        listHtml(mf.clearance_candidates, function(r){ return esc(r.name)+" (parado há "+r.last_sale_gap_days+"d)"; }),
+        "Têm faturamento histórico relevante mas pararam de vender — candidatos a cupom de reativação ou queima de estoque (sem dado de margem aqui, avalie antes de definir desconto)."));
+    }
+    if(mf.urgent_restock && mf.urgent_restock.length){
+      cards.push(dataCard("⚠️ Risco de ruptura (estoque casado)",
+        listHtml(mf.urgent_restock, function(r){ return esc(r.name)+" — "+r.dias_restantes+"d restantes"; }),
+        "Priorize reposição — são os SKUs com estoque casado que devem esgotar mais rápido no ritmo atual de venda."));
+    }
+    if(mf.low_conversion && mf.low_conversion.length){
+      cards.push(dataCard("🎯 Muita visita, pouca conversão",
+        listHtml(mf.low_conversion, function(r){ return esc(r.name)+" — "+fmtInt(r.visitas)+" visitas, "+(r.conversao_pct!=null?r.conversao_pct.toFixed(2).replace(".",","):"—")+"% conversão"; }),
+        "O anúncio atrai clique mas não fecha venda — candidatos a revisar foto, preço, descrição ou prazo de entrega antes de investir mais em tráfego pago. (Relatório de visitas/conversão: "+esc((STATE.data.overview.traffic_info&&STATE.data.overview.traffic_info.period_label)||"período importado")+".)"));
+    }
+    cards.push(dataCard("📈 SKUs ativos",
+      mf.active_sku_pct+"% do catálogo teve venda nos últimos 90 dias.",
+      "Se essa fatia for baixa, considere revisar ou descontinuar anúncios do catálogo parado — cada anúncio ativo tem custo de atenção/relevância no marketplace."));
+    document.getElementById("marketing-data-cards").innerHTML = cards.join("");
+  }
+
+  var pm = mf && mf.promotion_matrix;
+  if(pm){
+    var c = pm.counts || {};
+    document.getElementById("promo-matrix-legend").innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11.5px">'+
+        '<div><b>Demanda ALTA</b> + Estoque ALTO → <span style="color:var(--good)">SEGURAR/CAPTURAR</span> ('+(c.segurar_testar||0)+')</div>'+
+        '<div><b>Demanda ALTA</b> + Estoque BAIXO → <span style="color:var(--good)">NÃO PROMOVER</span> ('+(c.nao_promover||0)+')</div>'+
+        '<div><b>Demanda BAIXA</b> + Estoque ALTO → <span style="color:var(--critical)">PROMOVER</span> ('+(c.promover||0)+')</div>'+
+        '<div><b>Demanda BAIXA</b> + Estoque BAIXO → <span style="color:var(--warning)">INVESTIGAR</span> ('+(c.investigar||0)+')</div>'+
+      '</div>'+
+      '<div class="section-note" style="margin-top:8px">Sinais de tendência divergentes (misto) → <span style="color:var(--warning)">INVESTIGAR EXPOSIÇÃO/CONVERSÃO</span> ('+(c.investigar_exposicao||0)+'). '+
+      (c.sem_dado||0)+' SKUs ficam de fora por não terem estoque casado no relatório mais recente.</div>';
+
+    function promoGroup(title, tone, key, hint){
+      var rows = pm[key] || [];
+      if(!rows.length) return "";
+      return '<div class="lane"><div class="lane-head"><h3 style="text-transform:none;letter-spacing:0;font-size:13px;color:'+tone+'">'+title+'</h3></div>'+
+        '<ul style="margin:4px 0 0;padding-left:16px;font-size:12px;line-height:1.7">'+
+        rows.map(function(r){
+          var cobertura = (r.dias_restantes!=null) ? Math.round(r.dias_restantes)+"d estoque" : "";
+          return '<li><b>'+esc(r.name)+'</b> — variação '+fmtPct(r.period_change_pct)+(cobertura?", "+cobertura:"")+
+            '<div style="color:var(--text-secondary);font-size:11px;margin:2px 0 6px">'+esc(r.promotion_rationale)+'</div></li>';
+        }).join("")+'</ul>'+
+        (hint? '<div class="section-note" style="margin-top:2px">'+hint+'</div>':'')+
+        '</div>';
+    }
+    var matrixCards = [
+      promoGroup("🔴 PROMOVER — demanda caindo, estoque alto", "var(--critical)", "promover"),
+      promoGroup("🟠 INVESTIGAR — demanda caindo, estoque já baixo", "var(--warning)", "investigar", "Não descontar aqui: o estoque baixo já vai acabar sozinho. Investigue por que parou de vender."),
+      promoGroup("🟡 INVESTIGAR EXPOSIÇÃO — sinais divergentes/estagnado", "var(--warning)", "investigar_exposicao", "Antes de mexer em preço: olhe visualizações, cliques e posição do anúncio em cada marketplace."),
+      promoGroup("🟢 NÃO PROMOVER — demanda alta, estoque baixo", "var(--good)", "nao_promover"),
+      promoGroup("🟢 SEGURAR/CAPTURAR — demanda alta, estoque alto", "var(--good)", "segurar_testar", "Considere sustentar preço, reforçar mídia ou até testar leve aumento de margem.")
+    ].filter(Boolean);
+    document.getElementById("promo-matrix-cards").innerHTML = matrixCards.join("") || '<div class="stock-empty">Sem SKUs suficientes com estoque casado ainda.</div>';
+  } else {
+    document.getElementById("promo-matrix-legend").innerHTML = "";
+    document.getElementById("promo-matrix-cards").innerHTML = '<div class="stock-empty">Sem dados suficientes ainda.</div>';
+  }
+
+  var external = [
+    {title:"🔗 Centralizar estoque e catálogo", body:"Sincronizar estoque entre canais evita vender o que não tem e reduz cancelamento — geralmente via ERP/hub de integração (Bling, Tiny, etc.)."},
+    {title:"💰 Precificação por canal, não preço único", body:"Calcule a margem real considerando comissão e frete de cada marketplace — copiar o mesmo preço em todos os canais costuma corroer margem nos mais caros."},
+    {title:"🎯 Padronizar atendimento entre canais", body:"Mesma política de troca/garantia e tempo de resposta em todos os marketplaces — a experiência inconsistente prejudica reputação/avaliações."},
+    {title:"🔍 Pesquisar demanda antes de comprar estoque", body:"Nem todo produto vende igual em todos os canais — validar demanda por marketplace antes de imobilizar capital em compra evita encalhe."},
+    {title:"📊 Acompanhar métricas por canal", body:"Taxa de ruptura, margem real e recompra variam por marketplace — medir separado (não só o total consolidado) mostra onde vale investir mais."}
+  ];
+  document.getElementById("marketing-external-cards").innerHTML = external.map(function(c){
+    return '<div class="lane"><div class="lane-head"><h3 style="text-transform:none;letter-spacing:0;font-size:13px">'+c.title+'</h3></div>'+
+      '<div class="section-note" style="padding:0 2px 4px">'+c.body+'</div></div>';
+  }).join("");
+
+  var links = [
+    {t:"Guia de gestão multicanal pra sellers em marketplaces", u:"https://blog.expedy.com.br/gestao-multicanal-marketplaces/"},
+    {t:"Omnichannel no marketplace: integração Mercado Livre/Shopee/etc.", u:"https://hunterhub.com.br/blog/omnichannel-marketplace-brasil-integracao-mercado-livre-shopee-vender-varios-marketplaces-gestao-multicanal-ecommerce/"},
+    {t:"Panorama dos maiores marketplaces do Brasil em 2026", u:"https://mambadigital.com.br/blog/maiores-marketplaces-brasil/"},
+    {t:"Como vender no Magalu Marketplace — guia completo", u:"https://www.ideris.com.br/blog/vender-magazine-luiza-marketplace-magalu/"}
+  ];
+  document.getElementById("marketing-links").innerHTML = links.map(function(l){
+    return '<li><a href="'+esc(l.u)+'" target="_blank" rel="noopener">'+esc(l.t)+'</a></li>';
+  }).join("");
+}
+function dataCard(title, body, tip){
+  return '<div class="lane"><div class="lane-head"><h3 style="text-transform:none;letter-spacing:0;font-size:13px">'+title+'</h3></div>'+
+    '<div style="font-size:12.5px;line-height:1.6;padding:0 2px">'+body+'</div>'+
+    (tip? '<div class="section-note" style="margin-top:8px;padding:0 2px"><b>Ideia:</b> '+tip+'</div>' : '') +
+    '</div>';
+}
+function listHtml(items, fmt){
+  return '<ul style="margin:4px 0 0;padding-left:16px">' + items.map(function(it){ return '<li>'+fmt(it)+'</li>'; }).join("") + '</ul>';
+}
+
+/* ---------------- tabela de SKUs ---------------- */
+function applyFiltersAndRender(){
+  var json = STATE.data;
+  var n = STATE.explorerPeriod;
+  var list = json.skus.filter(function(s){
+    if(STATE.activeOnly && !(s.last_sale_gap_days!=null && s.last_sale_gap_days<=90)) return false;
+    if(STATE.storeFilter && s.top_store!==STATE.storeFilter) return false;
+    if(STATE.search){
+      var q = STATE.search.toLowerCase();
+      if(s.name.toLowerCase().indexOf(q)<0 && s.sku.toLowerCase().indexOf(q)<0) return false;
+    }
+    return true;
+  });
+  list.sort(function(a,b){
+    var dir = STATE.sortDir==="asc" ? 1 : -1;
+    switch(STATE.sortKey){
+      case "last30": return dir*((periodSales(a,n))-(periodSales(b,n)));
+      case "change": return dir*((a.period_change_pct||0)-(b.period_change_pct||0));
+      case "total": return dir*(a.total_sales-b.total_sales);
+      case "stock": return dir*(((a.estoque&&a.estoque.saldo_atual)||-1)-((b.estoque&&b.estoque.saldo_atual)||-1));
+      case "visits": return dir*(((a.trafego&&a.trafego.visitas)||-1)-((b.trafego&&b.trafego.visitas)||-1));
+      case "conv": return dir*(((a.trafego&&a.trafego.conversao_pct!=null)?a.trafego.conversao_pct:-1)-((b.trafego&&b.trafego.conversao_pct!=null)?b.trafego.conversao_pct:-1));
+      case "score": return dir*((a.score||0)-(b.score||0));
+      case "name": return dir*(a.name.localeCompare(b.name));
+      default: return 0;
+    }
+  });
+  STATE.filtered = list;
+  STATE.page = 0;
+  renderTablePage();
+}
+
+function scoreBadge(s){
+  var v = s.score;
+  if(v==null) return '<span class="text-muted" style="color:var(--text-muted)">—</span>';
+  var tone = v>=65 ? "var(--good)" : (v>=45 ? "var(--warning)" : "var(--critical)");
+  return '<span class="tabular" style="font-weight:800;color:'+tone+'">'+v.toFixed(1)+'</span>';
+}
+
+function trendBadge(s){
+  var streak = streakHtml(s);
+  if(s.trend_label==="acelerando") return '<span class="badge good">↑ Acelerando</span>'+streak;
+  if(s.trend_label==="desacelerando") return '<span class="badge critical">↓ Desacelerando</span>'+streak;
+  if(s.trend_label==="historico_curto") return '<span class="badge neutral">Histórico curto</span>';
+  return '<span class="badge neutral">Misto</span>'+streak;
+}
+/* Ranking de setas: quantos meses SEGUIDOS (contando pra trás a partir do
+   mês mais recente com dado) o SKU caiu (variação mensal negativa) ou
+   subiu (variação mensal positiva), até 3. Usa monthly_board (últimos 5
+   meses fechados/parcial) já calculado no back-end — é direção mês a mês
+   (queda ou alta), não o mesmo limiar de 20% usado pra Acelerando/
+   Desacelerando, por isso pode aparecer junto com "Misto" também. */
+function trendStreak(s){
+  var mb = s.monthly_board;
+  if(!mb || !mb.length) return {dir:null, count:0};
+  var dir = null, count = 0;
+  for(var i=mb.length-1; i>=0; i--){
+    var chg = mb[i].chg;
+    if(chg==null || chg===0) break;
+    var d = chg>0 ? "up" : "down";
+    if(dir===null) dir = d;
+    if(d!==dir) break;
+    count++;
+    if(count>=3) break;
+  }
+  return {dir:dir, count:count};
+}
+function streakHtml(s){
+  var st = trendStreak(s);
+  if(st.count<1) return "";
+  var isDown = st.dir==="down";
+  var arrow = isDown ? "▼" : "▲";
+  var word = st.count===1 ? "mês" : "meses";
+  var verb = isDown ? "caindo" : "subindo";
+  return ' <span class="badge '+(isDown?"critical":"good")+'" title="'+verb+' há '+st.count+' '+word+' seguidos (variação mensal)">'+
+    arrow.repeat(st.count)+' '+st.count+'m</span>';
+}
+
+function renderTablePage(){
+  var list = STATE.filtered;
+  var n = STATE.explorerPeriod;
+  var start = STATE.page*PAGE_SIZE;
+  var pageItems = list.slice(start, start+PAGE_SIZE);
+  var tbody = document.getElementById("sku-tbody");
+  ["th-period-1","th-period-2"].forEach(function(id){ document.getElementById(id).textContent = n+"d"; });
+  if(!pageItems.length){
+    tbody.innerHTML = '<tr><td colspan="12"><div class="empty-state">Nenhum SKU encontrado com esses filtros.</div></td></tr>';
+  } else {
+    tbody.innerHTML = pageItems.map(function(s){
+      var changeCls = s.period_change_pct>0.5?"up":(s.period_change_pct<-0.5?"down":"flat");
+      var stockCell = s.estoque ? (s.estoque.compartilhado ? '<span title="Saldo do modelo, compartilhado entre as variações/lotes — estimado, pode superestimar este SKU">~'+fmtInt(s.estoque.saldo_atual)+'</span>' : fmtInt(s.estoque.saldo_atual)) : '<span class="text-muted" style="color:var(--text-muted)">—</span>';
+      var muted = '<span class="text-muted" style="color:var(--text-muted)">—</span>';
+      var visitsCell = (s.trafego && s.trafego.visitas!=null) ? fmtInt(s.trafego.visitas) : muted;
+      var convCell = muted;
+      if(s.trafego && s.trafego.conversao_pct!=null){
+        var convWarn = s.trafego.alta_visita_baixa_conversao;
+        convCell = '<span'+(convWarn?' class="delta down" title="Muita visita, pouca conversão — oportunidade de revisar anúncio"':'')+'>'+s.trafego.conversao_pct.toFixed(2).replace(".",",")+'%</span>';
+      }
+      return '<tr data-sku="'+esc(s.sku)+'">'+
+        '<td onclick="event.stopPropagation()">'+flagCellHtml(s.sku)+'</td>'+
+        '<td><div class="sku-name">'+esc(s.name)+'</div><div class="sku-code">'+esc(s.sku)+'</div></td>'+
+        '<td>'+esc(s.top_store||"—")+'</td>'+
+        '<td class="num tabular">'+fmtInt(periodQty(s,n))+'</td>'+
+        '<td class="num tabular">'+fmtBRLShort(periodSales(s,n))+'</td>'+
+        '<td class="num tabular delta '+changeCls+'">'+fmtPct(s.period_change_pct)+'</td>'+
+        '<td class="num tabular">'+stockCell+'</td>'+
+        '<td class="num tabular">'+visitsCell+'</td>'+
+        '<td class="num tabular">'+convCell+'</td>'+
+        '<td class="num">'+scoreBadge(s)+'</td>'+
+        '<td>'+trendBadge(s)+'</td>'+
+        '<td class="spark-cell">'+sparkSvg(s.spark_qty, s.trend_label==="acelerando"?"var(--good)":(s.trend_label==="desacelerando"?"var(--critical)":"var(--accent)"))+'</td>'+
+        '</tr>';
+    }).join("");
+    tbody.querySelectorAll("tr[data-sku]").forEach(function(row){
+      row.addEventListener("click", function(){ openDrawer(row.getAttribute("data-sku")); });
+    });
+    bindFlagButtons(tbody);
+  }
+  var totalPages = Math.max(1, Math.ceil(list.length/PAGE_SIZE));
+  document.getElementById("pager").innerHTML =
+    '<button id="prev-page" '+(STATE.page===0?"disabled":"")+'>← Anterior</button>'+
+    '<span>Página '+(STATE.page+1)+' de '+totalPages+' · '+list.length+' SKUs</span>'+
+    '<button id="next-page" '+(STATE.page>=totalPages-1?"disabled":"")+'>Próxima →</button>';
+  var prevBtn = document.getElementById("prev-page"), nextBtn = document.getElementById("next-page");
+  if(prevBtn) prevBtn.addEventListener("click", function(){ STATE.page--; renderTablePage(); window.scrollTo({top:document.getElementById("sku-tbody").getBoundingClientRect().top+window.scrollY-100, behavior:"smooth"}); });
+  if(nextBtn) nextBtn.addEventListener("click", function(){ STATE.page++; renderTablePage(); window.scrollTo({top:document.getElementById("sku-tbody").getBoundingClientRect().top+window.scrollY-100, behavior:"smooth"}); });
+}
+
+/* ---------------- painel de detalhe (drawer) ---------------- */
+function findSku(sku){ return STATE.data.skus.find(function(s){ return s.sku===sku; }); }
+
+function openDrawer(sku){
+  var s = findSku(sku);
+  if(!s) return;
+  var flagLabels = {
+    demanda_acelerando:{cls:"good",label:"Demanda acelerando"},
+    demanda_desacelerando:{cls:"critical",label:"Demanda desacelerando"},
+    parado_ha_30d_ou_mais:{cls:"warning",label:"Sem venda há "+s.last_sale_gap_days+"d"},
+    queda_forte_30d:{cls:"serious",label:"Queda forte (30d)"},
+    crescimento_forte_30d:{cls:"good",label:"Crescimento forte (30d)"}
+  };
+  var tagsHtml = s.opportunity_flags.map(function(f){
+    var m = flagLabels[f]; if(!m) return "";
+    return '<span class="tag '+m.cls+'">'+esc(m.label)+'</span>';
+  }).join("");
+
+  var storesHtml = s.store_breakdown.map(function(r){
+    return '<div class="store-mini"><span>'+esc(r.store)+'</span><span class="tabular">'+fmtInt(r.qty)+' un · '+fmtBRLShort(r.net_sales)+'</span></div>';
+  }).join("") || '<div class="section-note">Sem vendas registradas.</div>';
+
+  var scoreLabels = {momentum:"Momentum (EMA12/EMA26)", macd:"MACD (histograma)", obv:"OBV (volume adaptado)", wma:"WMA(5) vs SMA30", rsi:"RSI(14)", volume:"Volume (crescimento + percentil)", estatistico:"Estatístico (z-score)", fibonacci:"Fibonacci (posição na faixa)", sazonalidade:"Sazonalidade (índice SI)", tendencia:"Tendência (regressão linear)", estoque:"Estoque (giro/dias restantes)", padroes:"Padrões já calculados"};
+  var scoreHtml = "";
+  if(s.score!=null && s.score_breakdown){
+    var coherencePct = s.score_coherence!=null ? Math.round(s.score_coherence*100) : null;
+    var interferenceLabel = coherencePct==null ? "" : (coherencePct>=70 ? "construtiva — score amplificado" : (coherencePct<=40 ? "destrutiva — score puxado pro neutro" : "neutra"));
+    scoreHtml = '<div class="drawer-section"><h3>Score de oportunidade — '+scoreBadge(s)+' <span class="section-note">de 100</span></h3>'+
+      '<div class="proj-grid" style="grid-template-columns:repeat(2,1fr)">'+
+        Object.keys(scoreLabels).map(function(k){
+          var v = s.score_breakdown[k];
+          return '<div><small>'+scoreLabels[k]+' <span class="section-note">('+Math.round((s.score_weights[k]||0)*100)+'%)</span></small><strong class="tabular">'+(v!=null?v.toFixed(1):'—')+'</strong></div>';
+        }).join("")+
+      '</div>'+
+      '<div class="section-note" style="margin-top:6px">Faixa Fibonacci atual: <b>'+esc(s.fib_band||"—")+'</b> da faixa histórica mín–máx do SKU. Combinação bruta (RMS ponderada): <b>'+(s.score_rms!=null?s.score_rms.toFixed(1):"—")+'</b> — depois ajustada por <b>interferência</b> (coerência entre os 12 sinais: '+(coherencePct!=null?coherencePct+'%':'—')+', '+interferenceLabel+') pro score final acima. Não é probabilidade validada por backtesting.</div>'+
+    '</div>';
+  }
+
+  var qProjHtml = "";
+  if(s.quantum_projection && s.quantum_projection.length){
+    var maxP = Math.max.apply(null, s.quantum_projection.map(function(p){ return p.prob_pct; }));
+    var peakLabel = s.quantum_peak_date ? fmtDate(s.quantum_peak_date) : "—";
+    qProjHtml = '<div class="drawer-section"><h3>Projeção quântica (próximos 14 dias)</h3>'+
+      '<div style="display:flex;gap:3px;align-items:flex-end;height:64px">'+
+        s.quantum_projection.map(function(p){
+          var h = maxP>0 ? Math.max(4, Math.round((p.prob_pct/maxP)*64)) : 4;
+          var isPeak = p.date===s.quantum_peak_date;
+          return '<div title="'+fmtDate(p.date)+': '+p.prob_pct+'%" style="flex:1;height:'+h+'px;border-radius:3px 3px 0 0;background:'+(isPeak?"var(--accent)":"var(--surface-2)")+'"></div>';
+        }).join("")+
+      '</div>'+
+      '<div class="section-note" style="margin-top:6px">Pico provável: <b>'+esc(peakLabel)+'</b>. Cada barra é uma amplitude (taxa esperada nesse dia-da-semana/mês, com leve decaimento por incerteza no horizonte) elevada ao quadrado e normalizada pra somar 100% entre os 14 dias — mesma lógica da regra de Born da mecânica quântica (P = |amplitude|²), usada aqui só como forma de distribuir a incerteza de QUANDO esse SKU deve vender, não é física quântica real nem previsão validada.</div>'+
+    '</div>';
+  }
+
+  var mcHtml = "";
+  if(s.monte_carlo_7d || (s.percentiles && s.percentiles["50"]!=null)){
+    var mc = s.monte_carlo_7d;
+    var pc = s.percentiles || {};
+    mcHtml = '<div class="drawer-section"><h3>Demanda provável (Monte Carlo · percentis)</h3>'+
+      (mc ? '<div class="proj-grid">'+
+        '<div><small>P10 (7 dias)</small><strong class="tabular">'+fmtInt(mc.p10)+' un</strong></div>'+
+        '<div><small>P50 · cenário central</small><strong class="tabular">'+fmtInt(mc.p50)+' un</strong></div>'+
+        '<div><small>P90 (7 dias)</small><strong class="tabular">'+fmtInt(mc.p90)+' un</strong></div>'+
+      '</div>' : '')+
+      (pc["50"]!=null ? '<div class="section-note" style="margin-top:8px">Quando vende, costuma vender: até <b>'+pc["50"]+'</b> un (P50), até <b>'+pc["75"]+'</b> (P75), até <b>'+pc["90"]+'</b> (P90) e até <b>'+pc["95"]+'</b> (P95) por pedido/dia.</div>' : '')+
+      '<div class="section-note" style="margin-top:6px">Monte Carlo: 1.000 simulações reamostrando (bootstrap) o próprio histórico diário do SKU, somando 7 dias por simulação — em vez de um número só, uma faixa (P10–P90) com cenário central em P50. Percentis calculados só sobre dias em que o SKU realmente vendeu.</div>'+
+    '</div>';
+  }
+
+  var signalsHtml = "";
+  if(s.signals_table && s.signals_table.length){
+    var toneOf = function(sig){ return sig==="green" ? "var(--good)" : (sig==="red" ? "var(--critical)" : "var(--text-muted)"); };
+    var dotCell = function(sig){ return '<td style="text-align:center"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+toneOf(sig)+'"></span></td>'; };
+    signalsHtml = '<div class="drawer-section"><h3>Sinais recentes (estilo mercado financeiro)</h3>'+
+      '<div class="table-wrap"><table style="font-size:12px"><thead><tr>'+
+        '<th>Data</th><th class="num">RSI</th><th>RSI</th><th class="num">MACD hist.</th><th>MACD</th><th>SMA7×30</th><th>WMA5×30</th>'+
+      '</tr></thead><tbody>'+
+      s.signals_table.map(function(r){
+        return '<tr><td class="tabular">'+fmtDate(r.date)+'</td>'+
+          '<td class="num tabular">'+r.rsi+'</td>'+dotCell(r.rsi_signal)+
+          '<td class="num tabular">'+r.macd_hist+'</td>'+dotCell(r.macd_signal)+
+          dotCell(r.sma_signal)+dotCell(r.wma_signal)+'</tr>';
+      }).join("")+
+      '</tbody></table></div>'+
+      '<div class="section-note" style="margin-top:6px">Verde = sinal favorável (RSI≥55, MACD>0, média curta acima da longa) · Vermelho = desfavorável. É leitura de indicador técnico adaptado de mercado financeiro pra padrão de vendas — não é recomendação, é insumo pro Score.</div>'+
+    '</div>';
+  }
+
+  var drawer = document.getElementById("drawer");
+  drawer.innerHTML =
+    '<div class="dh"><div><h2>'+esc(s.name)+'</h2><div class="sku-code">'+esc(s.sku)+(s.has_real_sku?"":" · SKU sintético (sem código na planilha)")+'</div></div>'+
+    '<div style="display:flex;gap:6px;flex:none">'+flagCellHtml(s.sku)+'<button class="close" id="drawer-close">✕</button></div></div>'+
+    '<div class="drawer-tags">'+tagsHtml+'</div>'+
+    '<div class="stat-row">'+
+      '<div><small>Faturamento total</small><strong class="tabular">'+fmtBRLShort(s.total_sales)+'</strong></div>'+
+      '<div><small>Un. total</small><strong class="tabular">'+fmtInt(s.total_qty)+'</strong></div>'+
+      '<div><small>Faturamento 30d</small><strong class="tabular">'+fmtBRLShort(s.last_30d_sales)+'</strong></div>'+
+      '<div><small>Variação 30d</small><strong class="tabular">'+fmtPct(s.period_change_pct)+'</strong></div>'+
+    '</div>'+
+    scoreHtml+
+    qProjHtml+
+    mcHtml+
+    signalsHtml+
+    '<div class="drawer-section"><h3>Indicadores (últimos 120 dias)</h3><div id="drawer-chart"></div></div>'+
+    '<div class="drawer-section"><h3>Projeção simples (média móvel × horizonte)</h3>'+
+      '<div class="proj-grid">'+
+        ['1','7','14','30'].map(function(h){ return '<div><small>'+h+'d</small><strong class="tabular">'+(s.projections[h]!=null? s.projections[h].toLocaleString("pt-BR",{maximumFractionDigits:1}):"—")+' un</strong></div>'; }).join("")+
+      '</div></div>'+
+    '<div class="drawer-section"><h3>Por marketplace</h3>'+storesHtml+'</div>'+
+    (s.trafego ? (
+    '<div class="drawer-section"><h3>Tráfego &amp; conversão'+(s.trafego.alta_visita_baixa_conversao?' <span class="delta down" style="font-size:11px;font-weight:700">⚠ muita visita, pouca conversão</span>':'')+'</h3>'+
+      '<div class="stat-row">'+
+        '<div><small>Visitas</small><strong class="tabular">'+(s.trafego.visitas!=null?fmtInt(s.trafego.visitas):"—")+'</strong></div>'+
+        '<div><small>Pedidos finalizados</small><strong class="tabular">'+(s.trafego.pedidos_finalizados!=null?fmtInt(s.trafego.pedidos_finalizados):"—")+'</strong></div>'+
+        '<div><small>Conversão</small><strong class="tabular">'+(s.trafego.conversao_pct!=null?s.trafego.conversao_pct.toFixed(2).replace(".",",")+"%":"—")+'</strong></div>'+
+        '<div><small>Cancelamentos</small><strong class="tabular">'+(s.trafego.cancelamentos!=null?fmtInt(s.trafego.cancelamentos):"—")+'</strong></div>'+
+        '<div><small>Ticket médio</small><strong class="tabular">'+(s.trafego.ticket_medio!=null?fmtBRLShort(s.trafego.ticket_medio):"—")+'</strong></div>'+
+      '</div></div>'
+    ) : '')+
+    '<div class="drawer-section section-note">Primeira venda em '+fmtDate(s.first_seen)+' · última em '+fmtDate(s.last_seen)+'. SMA7 atual: '+s.sma7+' un/dia · RSI(14): '+s.rsi14+' · MACD hist.: '+s.macd_hist+'.</div>';
+
+  document.getElementById("drawer-close").addEventListener("click", closeDrawer);
+  bindFlagButtons(drawer);
+  drawSkuDetailChart(s);
+
+  document.getElementById("scrim").classList.add("open");
+  drawer.classList.add("open");
+  document.getElementById("scrim").onclick = closeDrawer;
+}
+function closeDrawer(){
+  document.getElementById("scrim").classList.remove("open");
+  document.getElementById("drawer").classList.remove("open");
+}
+
+function drawSkuDetailChart(s){
+  var el = document.getElementById("drawer-chart");
+  var mainSeries = [{name:"Qtd/dia", values:s.spark_qty, color:"var(--text-muted)"}];
+  if(STATE.indicators.indexOf("SMA")>=0){
+    mainSeries.push({name:"SMA7", values:s.spark_sma7, color:"var(--accent)"});
+    mainSeries.push({name:"SMA30", values:s.spark_sma30, color:"var(--series-3)"});
+  }
+  drawLineChart(el, s.spark_dates, mainSeries, {height:170, valueFmt:function(v){ return v.toFixed(1); }});
+
+  if(STATE.indicators.indexOf("RSI")>=0){
+    var rsiWrap = document.createElement("div");
+    rsiWrap.innerHTML = '<div class="section-note" style="margin:8px 0 2px">RSI(14) sobre SMA7 — acima de 70 = alta recente intensa, abaixo de 30 = queda recente intensa</div>';
+    el.appendChild(rsiWrap);
+    var rsiEl = document.createElement("div"); el.appendChild(rsiEl);
+    drawLineChart(rsiEl, s.spark_dates, [{name:"RSI14", values:s.spark_rsi14, color:"var(--series-3)"}], {height:110, valueFmt:function(v){return v.toFixed(0);}});
+  }
+  if(STATE.indicators.indexOf("MACD")>=0){
+    var macdWrap = document.createElement("div");
+    macdWrap.innerHTML = '<div class="section-note" style="margin:8px 0 2px">Histograma MACD — acima de zero = ganhando impulso, abaixo = perdendo</div>';
+    el.appendChild(macdWrap);
+    var macdEl = document.createElement("div"); el.appendChild(macdEl);
+    drawLineChart(macdEl, s.spark_dates, [{name:"MACD hist.", values:s.spark_macd_hist, color:"var(--series-2)"}], {height:110, valueFmt:function(v){return v.toFixed(2);}});
+  }
+}
+
+/* ---------------- controles ---------------- */
+function wireControls(json){
+  document.getElementById("search-input").addEventListener("input", function(e){
+    STATE.search = e.target.value.trim(); applyFiltersAndRender();
+  });
+  document.getElementById("store-filter").addEventListener("change", function(e){
+    STATE.storeFilter = e.target.value; applyFiltersAndRender();
+  });
+  document.getElementById("active-toggle").addEventListener("change", function(e){
+    STATE.activeOnly = e.target.checked; applyFiltersAndRender();
+  });
+  document.getElementById("sort-select").addEventListener("change", function(e){
+    var v = e.target.value, parts = v.split("_");
+    var validKeys = {change:1,total:1,stock:1,score:1,name:1,last30:1,visits:1,conv:1};
+    STATE.sortKey = validKeys[parts[0]] ? parts[0] : "last30";
+    STATE.sortDir = parts[1];
+    applyFiltersAndRender();
+  });
+  document.querySelectorAll("#range-tabs button").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll("#range-tabs button").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      STATE.overviewRange = btn.getAttribute("data-range");
+      renderOverviewChart(json.overview, STATE.overviewRange);
+    });
+  });
+  document.querySelectorAll("#kpi-range-tabs button").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll("#kpi-range-tabs button").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      STATE.kpiRange = parseInt(btn.getAttribute("data-range"),10);
+      renderKpis(json.overview);
+    });
+  });
+  document.getElementById("board-store-filter").addEventListener("change", function(e){
+    STATE.boardStoreFilter = e.target.value;
+    renderBoard(json.skus);
+  });
+  document.getElementById("board-date-from").addEventListener("change", function(e){
+    STATE.boardDateFrom = e.target.value; renderBoard(json.skus);
+  });
+  document.getElementById("board-date-to").addEventListener("change", function(e){
+    STATE.boardDateTo = e.target.value; renderBoard(json.skus);
+  });
+  document.getElementById("board-export-btn").addEventListener("click", function(){
+    var pool = STATE.boardPool || json.skus;
+    var months = (STATE.data && STATE.data.overview.board_months) || [];
+    var latestKey = months.length ? months[months.length-1].key : "";
+    var monthKey = STATE.boardMonth || latestKey;
+    var isCurrent = !STATE.boardMonth || STATE.boardMonth===latestKey;
+    function laneOf(m){
+      if(m.trend==="acelerando") return "Acelerando";
+      if(m.trend==="desacelerando") return "Desacelerando";
+      var hasStock = false;
+      if(m.isStale) return m.hasStock ? "Parado com estoque" : "Parado 30d+";
+      return "Misto";
+    }
+    var header = ["SKU","Produto","Mes_referencia","Lane","Variacao_pct","Dias_parado","Estoque_atual","Faturamento_total_BRL","Ultima_venda"];
+    var rows = pool.map(function(s){
+      var m = boardMetrics(s, monthKey, isCurrent);
+      if(!m) return null;
+      m.hasStock = s.estoque && s.estoque.saldo_atual>0;
+      return [s.sku, s.name, monthKey, laneOf(m), m.chg==null?"":m.chg,
+        m.gap==null?"":m.gap,
+        s.estoque&&s.estoque.saldo_atual!=null?s.estoque.saldo_atual:"",
+        s.total_sales.toFixed(2), s.last_seen];
+    }).filter(Boolean);
+    exportRowsAsCsv("quadro_oportunidades_"+monthKey, header, rows, "board-export-btn");
+  });
+  document.querySelectorAll("#explorer-period-tabs button").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll("#explorer-period-tabs button").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      STATE.explorerPeriod = parseInt(btn.getAttribute("data-period"),10);
+      applyFiltersAndRender();
+    });
+  });
+  document.getElementById("export-csv-btn").addEventListener("click", exportCsv);
+  document.querySelectorAll("#indicator-row .chip-toggle").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var ind = btn.getAttribute("data-ind");
+      var idx = STATE.indicators.indexOf(ind);
+      if(idx>=0){
+        if(STATE.indicators.length>1){ STATE.indicators.splice(idx,1); btn.classList.remove("active"); }
+      } else {
+        if(STATE.indicators.length>=2){
+          var removed = STATE.indicators.shift();
+          document.querySelector('[data-ind="'+removed+'"]').classList.remove("active");
+        }
+        STATE.indicators.push(ind); btn.classList.add("active");
+      }
+    });
+  });
+  window.addEventListener("resize", debounce(function(){
+    renderOverviewChart(json.overview, STATE.overviewRange);
+    var openSku = document.getElementById("drawer").classList.contains("open");
+  }, 200));
+}
+function debounce(fn, ms){ var t; return function(){ clearTimeout(t); var a=arguments; t=setTimeout(function(){ fn.apply(null,a); }, ms); }; }
+
+/* ---------------- exportar CSV (genérico, reutilizado em vários painéis) ---------------- */
+function csvEscape(v){
+  var s = v==null ? "" : String(v);
+  if(/[",;\n]/.test(s)) s = '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+function rowsToCsv(header, rows){
+  var all = [header].concat(rows);
+  return all.map(function(r){ return r.map(csvEscape).join(";"); }).join("\r\n");
+}
+function exportRowsAsCsv(nameSuffix, header, rows, btnId){
+  var csv = "﻿" + rowsToCsv(header, rows); // BOM pra abrir certinho acentuação no Excel
+  var filename = "magalu_"+nameSuffix+"_" + (STATE.data.overview.data_through||"") + ".csv";
+  function afterFail(){ fallbackCopy(csv, btnId); }
+  if(window.claude && typeof window.claude.use === "function"){
+    window.claude.use("downloads").then(function(downloads){
+      if(!downloads){ afterFail(); return; }
+      return downloads.save({filename:filename, data:csv}).catch(afterFail);
+    }).catch(afterFail);
+  } else {
+    afterFail();
+  }
+}
+function fallbackCopy(csv, btnId){
+  var btn = btnId && document.getElementById(btnId);
+  var restore = btn ? btn.textContent : null;
+  function done(msg){ if(btn){ btn.textContent = msg; setTimeout(function(){ btn.textContent = restore; }, 2200); } }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(csv).then(function(){ done("✓ CSV copiado!"); }).catch(function(){ done("Não consegui copiar"); });
+  } else {
+    done("Exportação indisponível aqui");
+  }
+}
+function exportCsv(){
+  var n = STATE.explorerPeriod;
+  var header = ["SKU","Produto","Marketplace principal","Qtd_"+n+"d","Faturamento_"+n+"d_BRL","Variacao_30d_pct","Estoque_atual","Visitas_periodo","Conversao_pct","Score_Oportunidade","Tendencia","Faturamento_total_BRL","Ultima_venda"];
+  var rows = STATE.filtered.map(function(s){
+    return [s.sku, s.name, s.top_store||"", periodQty(s,n),
+      periodSales(s,n).toFixed(2), s.period_change_pct==null?"":s.period_change_pct,
+      s.estoque && s.estoque.saldo_atual!=null ? s.estoque.saldo_atual : "",
+      s.trafego && s.trafego.visitas!=null ? s.trafego.visitas : "",
+      s.trafego && s.trafego.conversao_pct!=null ? s.trafego.conversao_pct : "",
+      s.score==null?"":s.score,
+      s.trend_label, s.total_sales.toFixed(2), s.last_seen];
+  });
+  exportRowsAsCsv("sku_export", header, rows, "export-csv-btn");
+}
+
+})();
+</script>
+
+</body></html>

@@ -1,0 +1,4 @@
+# Dados reais da Magalu nunca entram no Git (ficam no bucket privado do Supabase)
+**/magalu/*.json
+dashboard_data.json
+series_365d.json

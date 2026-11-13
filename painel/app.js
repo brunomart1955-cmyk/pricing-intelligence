@@ -20,7 +20,7 @@
 
   // ---------- Telas ----------
   function mostrar(tela) {
-    ['setup', 'auth', 'app'].forEach(t => { $(`#view-${t}`).hidden = t !== tela; });
+    ['setup', 'auth', 'pendente', 'app', 'usuarios'].forEach(t => { $(`#view-${t}`).hidden = t !== tela; });
   }
   function msg(el, texto, tipo) { el.textContent = texto || ''; el.className = `msg ${tipo || ''}`; }
 
@@ -351,19 +351,139 @@
       if (sessao) {
         $('#user-box').hidden = false;
         $('#user-email').textContent = sessao.user.email;
-        if (store !== storeSupabase) { store = storeSupabase; mostrar('app'); carregar(); }
+        if (usuarioAtual !== sessao.user.id) {
+          usuarioAtual = sessao.user.id;
+          // Fora do fluxo do onAuthStateChange (evita travar o cliente do Supabase).
+          setTimeout(() => entrar(sessao), 0);
+        }
       } else {
+        usuarioAtual = null; acesso = null;
         store = null; snapshots = []; ofertas = [];
         $('#user-box').hidden = true;
+        $('#nav').hidden = true;
         mostrar('auth');
       }
     });
+  }
+
+  // ---------- Acesso (aprovação pelo admin) ----------
+  let usuarioAtual = null;
+  let acesso = null; // { status, admin }
+
+  async function entrar(sessao) {
+    const { data, error } = await sb.from('acessos').select('status, admin').eq('user_id', sessao.user.id).maybeSingle();
+    if (error && /acessos/.test(error.message) && /(find|exist)/i.test(error.message)) {
+      acesso = { status: 'aprovado', admin: false, semControle: true }; // acessos.sql ainda não foi rodado
+    } else if (error) {
+      msg($('#pend-msg'), `Erro ao verificar acesso: ${error.message}`, 'error');
+      mostrar('pendente');
+      return;
+    } else {
+      acesso = data || { status: 'pendente', admin: false };
+    }
+
+    if (acesso.status !== 'aprovado') {
+      $('#pend-titulo').textContent = acesso.status === 'bloqueado' ? 'Acesso bloqueado' : 'Aguardando aprovação';
+      $('#pend-texto').textContent = acesso.status === 'bloqueado'
+        ? 'Sua conta foi bloqueada pelo administrador. Fale com ele para liberar o acesso.'
+        : 'Sua conta foi criada. Assim que o administrador aprovar, você poderá usar o painel e a extensão. Depois de aprovado, clique em "Verificar de novo".';
+      mostrar('pendente');
+      return;
+    }
+
+    $('#nav').hidden = false;
+    $('#nav-admin').hidden = !acesso.admin;
+    store = storeSupabase;
+    irPara(location.hash === '#usuarios' && acesso.admin ? 'usuarios' : 'app');
+    carregar();
+  }
+
+  function irPara(tela) {
+    document.querySelectorAll('#nav [data-ir]').forEach(a => a.classList.toggle('ativo', a.dataset.ir === tela));
+    mostrar(tela);
+    if (tela === 'usuarios') carregarUsuarios();
+  }
+
+  const ROTULO_STATUS = { pendente: 'Pendente', aprovado: 'Aprovado', bloqueado: 'Bloqueado' };
+
+  async function carregarUsuarios() {
+    const corpo = $('#usuarios-lista');
+    corpo.innerHTML = '<tr><td colspan="5" class="empty">Carregando…</td></tr>';
+    const { data, error } = await sb.from('acessos').select('user_id, email, status, admin, criado_em').order('criado_em', { ascending: false });
+    if (error) { corpo.innerHTML = `<tr><td colspan="5" class="empty">Erro: ${esc(error.message)}</td></tr>`; return; }
+    const pendentes = data.filter(u => u.status === 'pendente').length;
+    $('#usuarios-resumo').textContent = `${data.length} conta(s) · ${pendentes} aguardando aprovação`;
+    corpo.innerHTML = data.map(u => {
+      const eu = u.user_id === usuarioAtual;
+      const botoes = eu ? '<span class="muted">você</span>' : [
+        u.status !== 'aprovado' && `<button class="primary" data-acao="aprovar" data-id="${esc(u.user_id)}">Aprovar</button>`,
+        u.status !== 'bloqueado' && `<button class="danger" data-acao="bloquear" data-id="${esc(u.user_id)}">Bloquear</button>`,
+        u.status === 'aprovado' && `<button data-acao="${u.admin ? 'tirar-admin' : 'admin'}" data-id="${esc(u.user_id)}">${u.admin ? 'Remover admin' : 'Tornar admin'}</button>`
+      ].filter(Boolean).join(' ');
+      return `<tr><td>${esc(u.email)}</td><td><span class="status st-${esc(u.status)}">${ROTULO_STATUS[u.status] || esc(u.status)}</span></td><td>${u.admin ? 'Admin' : 'Usuário'}</td><td>${esc(fmtData(new Date(u.criado_em)))}</td><td class="acoes-usuario">${botoes}</td></tr>`;
+    }).join('') || '<tr><td colspan="5" class="empty">Nenhuma conta.</td></tr>';
+    listarArquivosMagalu();
+  }
+
+  async function alterarUsuario(id, acao) {
+    const mudanca = { aprovar: { status: 'aprovado' }, bloquear: { status: 'bloqueado', admin: false }, admin: { admin: true }, 'tirar-admin': { admin: false } }[acao];
+    if (!mudanca) return;
+    if (acao === 'bloquear' && !confirm('Bloquear esta conta? Ela perde o acesso ao painel, à extensão e aos dados da Magalu.')) return;
+    const { error } = await sb.from('acessos').update(mudanca).eq('user_id', id);
+    msg($('#usuarios-msg'), error ? `Erro: ${error.message}` : 'Alteração salva.', error ? 'error' : 'ok');
+    carregarUsuarios();
+  }
+
+  const ARQUIVOS_MAGALU = ['dashboard_data.json', 'series_365d.json'];
+
+  async function listarArquivosMagalu() {
+    const alvo = $('#magalu-arquivos');
+    const { data, error } = await sb.storage.from('magalu').list('', { limit: 20 });
+    if (error) { alvo.textContent = `Erro ao listar: ${error.message}`; return; }
+    alvo.innerHTML = ARQUIVOS_MAGALU.map(nome => {
+      const f = data.find(x => x.name === nome);
+      const info = f ? `enviado em ${esc(fmtData(new Date(f.updated_at || f.created_at)))} · ${(f.metadata?.size / 1048576 || 0).toFixed(1).replace('.', ',')} MB` : '<span class="nuvem-falta">ainda não enviado</span>';
+      return `<div class="snap"><div><b>${nome}</b><small>${info}</small></div></div>`;
+    }).join('');
+  }
+
+  async function enviarArquivosMagalu(files) {
+    const lista = [...files];
+    const invalidos = lista.filter(f => !ARQUIVOS_MAGALU.includes(f.name));
+    if (invalidos.length) return msg($('#magalu-msg'), `Use exatamente os nomes ${ARQUIVOS_MAGALU.join(' e ')} (recebi: ${invalidos.map(f => f.name).join(', ')}).`, 'error');
+    for (const f of lista) {
+      msg($('#magalu-msg'), `Enviando ${f.name}…`);
+      try { JSON.parse(await f.text()); } catch { return msg($('#magalu-msg'), `${f.name} não é um JSON válido.`, 'error'); }
+      const { error } = await sb.storage.from('magalu').upload(f.name, f, { upsert: true, contentType: 'application/json', cacheControl: '60' });
+      if (error) return msg($('#magalu-msg'), `Erro ao enviar ${f.name}: ${error.message}`, 'error');
+    }
+    msg($('#magalu-msg'), 'Arquivos da Magalu atualizados.', 'ok');
+    listarArquivosMagalu();
+  }
+
+  function ligarAcesso() {
+    document.querySelectorAll('#nav [data-ir]').forEach(a => a.addEventListener('click', e => {
+      e.preventDefault();
+      history.replaceState(null, '', a.dataset.ir === 'usuarios' ? '#usuarios' : '#');
+      irPara(a.dataset.ir);
+    }));
+    $('#pend-recheck').addEventListener('click', async () => {
+      const { data } = await sb.auth.getSession();
+      if (data.session) entrar(data.session);
+    });
+    $('#pend-sair').addEventListener('click', () => sb.auth.signOut());
+    $('#usuarios-lista').addEventListener('click', e => {
+      const b = e.target.closest('button[data-acao]');
+      if (b) alterarUsuario(b.dataset.id, b.dataset.acao);
+    });
+    $('#magalu-input').addEventListener('change', e => { enviarArquivosMagalu(e.target.files); e.target.value = ''; });
   }
 
   // ---------- Início ----------
   ligarEventos();
   if (temSupabase) {
     ajustarAuth();
+    ligarAcesso();
     ligarAuth();
   } else {
     mostrar('setup');

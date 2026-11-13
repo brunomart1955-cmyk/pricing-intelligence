@@ -101,7 +101,11 @@ async function rest(token, metodo, caminho, corpo) {
     body: corpo ? JSON.stringify(corpo) : undefined
   });
   const data = await resp.json().catch(() => null);
-  if (!resp.ok) throw new Error(data?.message || `Erro ${resp.status} ao enviar`);
+  if (!resp.ok) {
+    // RLS recusou: a conta existe mas ainda não foi aprovada (ou foi bloqueada) pelo admin.
+    if (data?.code === '42501') throw new Error('sua conta ainda não foi aprovada pelo administrador do painel.');
+    throw new Error(data?.message || `Erro ${resp.status} ao enviar`);
+  }
   return data;
 }
 

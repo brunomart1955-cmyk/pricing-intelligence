@@ -19,6 +19,11 @@
         <small>Painel de inteligência de preços</small>
       </div>
     </div>
+    <nav id="nav" class="nav" hidden>
+      <a href="#" data-ir="app" class="ativo">Preços</a>
+      <a href="magalu/">Magalu</a>
+      <a href="#usuarios" data-ir="usuarios" id="nav-admin" hidden>Usuários</a>
+    </nav>
     <div id="user-box" class="user-box" hidden>
       <span id="user-email"></span>
       <button id="logout-btn" class="ghost">Sair</button>
@@ -52,6 +57,45 @@
       <button id="auth-forgot" class="link">Esqueci a senha</button>
     </div>
   </section>
+
+  <!-- Conta pendente / bloqueada -->
+  <section id="view-pendente" class="center-card" hidden>
+    <h1 id="pend-titulo">Aguardando aprovação</h1>
+    <p id="pend-texto" class="muted"></p>
+    <p id="pend-msg" class="msg" role="status"></p>
+    <div class="auth-links">
+      <button id="pend-recheck" class="primary">Verificar de novo</button>
+      <button id="pend-sair" class="ghost">Sair</button>
+    </div>
+  </section>
+
+  <!-- Admin: usuários e dados da Magalu -->
+  <main id="view-usuarios" hidden>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Usuários <small id="usuarios-resumo" class="muted"></small></h2>
+      </div>
+      <p class="muted">Contas novas entram como <b>Pendente</b> e não acessam nada até serem aprovadas. Bloquear tira o acesso ao painel, à extensão e aos dados da Magalu.</p>
+      <p id="usuarios-msg" class="msg" role="status"></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>E-mail</th><th>Situação</th><th>Papel</th><th>Criada em</th><th></th></tr></thead>
+          <tbody id="usuarios-lista"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Dados da Magalu Sales Intelligence</h2>
+      <p class="muted">Arquivos guardados no armazenamento privado: só contas aprovadas conseguem abrir. Para atualizar, envie os novos <code>dashboard_data.json</code> e <code>series_365d.json</code> (pode selecionar os dois juntos).</p>
+      <div id="magalu-arquivos" class="snap-list"></div>
+      <label class="drop" style="margin-top:12px">
+        <input id="magalu-input" type="file" accept=".json,application/json" multiple hidden>
+        <span class="drop-icon" aria-hidden="true">⬆</span>
+        <span><b>Enviar arquivos da Magalu</b><br><small>Clique para escolher os JSON</small></span>
+      </label>
+      <p id="magalu-msg" class="msg" role="status"></p>
+    </section>
+  </main>
 
   <!-- Painel -->
   <main id="view-app" hidden>
