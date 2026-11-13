@@ -94,14 +94,14 @@
     });
   }
 
-  async function carregar() {
-    msg($('#app-msg'), 'Carregando…');
+  async function carregar(silencioso = false) {
+    if (!silencioso) msg($('#app-msg'), 'Carregando…');
     try {
       snapshots = await store.listar();
       reconstruirOfertas();
       preencherFiltros();
       render();
-      msg($('#app-msg'), snapshots.length ? '' : 'Nenhuma importação ainda. Exporte o JSON na extensão e arraste aqui.');
+      if (!silencioso || !snapshots.length) msg($('#app-msg'), snapshots.length ? '' : 'Nenhum dado ainda. Entre com esta mesma conta na extensão (dashboard de Marketplaces) para enviar as ofertas automaticamente, ou arraste um JSON exportado.');
     } catch (e) {
       msg($('#app-msg'), `Erro ao carregar: ${e.message}`, 'error');
     }
@@ -289,6 +289,14 @@
     $('#export-csv').addEventListener('click', () => visiveis.length && baixar(`ofertas-${stamp()}.csv`, P.paraCSV(visiveis), 'text/csv;charset=utf-8'));
     $('#export-json').addEventListener('click', () => visiveis.length && baixar(`ofertas-${stamp()}.json`,
       JSON.stringify({ app: 'shopping-radar-painel', exportadoEm: new Date().toISOString(), ofertas: visiveis }, null, 2), 'application/json'));
+
+    // A extensão envia dados sozinha: ao voltar para esta aba, busca o que chegou.
+    let ultimaCarga = Date.now();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || !store || Date.now() - ultimaCarga < 10000) return;
+      ultimaCarga = Date.now();
+      carregar(true);
+    });
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => snapshots.length && render());
   }

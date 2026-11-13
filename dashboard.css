@@ -10,3 +10,14 @@
 .source-badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.4px;color:#9ec5eb;background:#1a2c46;border-radius:5px;padding:2px 6px;margin-right:6px;vertical-align:middle}
 
 @media(max-width:760px){.search-all>div{width:100%}.search-all{flex-direction:column;align-items:stretch}}
+/* Painel online (nuvem-ui.js) */
+.nuvem{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin:20px 0 4px;padding:14px 16px;background:#142237;border:1px solid #2c6aa8;border-radius:11px}
+.nuvem-info{display:grid;gap:3px;min-width:0}
+.nuvem-info>b{color:#76b9ff;font-size:13px;letter-spacing:.4px}
+.nuvem-info span{font-size:14px}
+.nuvem-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.nuvem-acoes input{border:1px solid #3b5472;border-radius:8px;background:#0f1c2e;color:#fff;padding:10px;font-size:13px;width:190px}
+.nuvem-acoes button{border:0;background:#287bd0;color:#fff;font-weight:bold;border-radius:8px;padding:10px 14px;cursor:pointer}
+.nuvem-acoes button:disabled{opacity:.6;cursor:default}
+.nuvem-acoes .nuvem-sec{background:transparent;border:1px solid #3b5472;color:#cfe0f5}
+.nuvem-erro{color:#ff8f8f}

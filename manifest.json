@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Shopping Radar",
-  "version": "2.2.0",
-  "description": "Painel de inteligência de preços com leitura local dos marketplaces.",
+  "version": "2.3.0",
+  "description": "Painel de inteligência de preços com leitura local dos marketplaces e sincronização com o painel online.",
   "permissions": [
     "storage",
-    "tabs"
+    "tabs",
+    "alarms"
   ],
   "action": {
     "default_title": "Abrir dashboard Shopping Radar"
@@ -46,5 +47,8 @@
       ],
       "run_at": "document_idle"
     }
+  ],
+  "host_permissions": [
+    "https://lmazvxvudbhoivgvhbin.supabase.co/*"
   ]
 }

@@ -53,6 +53,14 @@ Esses dois foram adicionados com a mesma lógica dos demais, mas com uma ressalv
 4. Selecione esta pasta.
 5. Recarregue a extensão após atualizações e abra uma busca ou anúncio em um marketplace suportado.
 
-## Exportar JSON e painel web
+## Painel online (extensão + site integrados)
 
-No dashboard de Marketplaces, o botão **⬇ Exportar JSON** baixa um arquivo com todos os dados coletados (Google Shopping + marketplaces). Esse arquivo pode ser importado no painel web [painel](painel/) — no ar em https://brunomart1955-cmyk.github.io/pricing-intelligence/painel/, que tem login, salva o histórico de cada usuário e mostra gráficos. A extensão em si continua sem login e sem credenciais.
+Site: https://brunomart1955-cmyk.github.io/pricing-intelligence/
+
+1. Crie a conta no site (e-mail e senha) e confirme pelo link do e-mail.
+2. No dashboard de **Marketplaces** (ou do Google Shopping) da extensão, entre com a mesma conta na barra **☁ Painel online**.
+3. Pronto: sempre que a extensão coletar ofertas, ela envia sozinha para o painel (~30 s depois da última mudança). Fica um registro por dia, atualizado ao longo do dia — isso forma o histórico de preços no site. O botão **↑ Enviar agora** força o envio na hora.
+
+Detalhes técnicos: a lógica está em `nuvem.js` (service worker) e a barra em `nuvem-ui.js`. A senha não é salva — só os tokens da sessão, renovados automaticamente. A chave usada é a *publishable* do Supabase; os dados são protegidos por RLS (`painel/supabase.sql`), então cada conta só vê os próprios registros.
+
+O botão **⬇ Exportar JSON** continua disponível para backup ou para importar manualmente no site.

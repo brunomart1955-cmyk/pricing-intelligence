@@ -1,3 +1,5 @@
+importScripts('nuvem.js'); // login + sincronização com o painel online
+
 // Ler a avaliação mais antiga (tentando ordenar a lista e carregar mais
 // páginas de opiniões) demora mais que uma leitura simples da ficha do
 // produto. 15s era curto demais e cortava a leitura no meio, o que também
