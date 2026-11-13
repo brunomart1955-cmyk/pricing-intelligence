@@ -35,7 +35,9 @@ Deno.serve(async (req) => {
 
   try {
     // Cliente com o token de quem chamou: as regras (RLS) valem como se fosse o próprio usuário.
-    const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    // Chave pública (publishable): projetos novos podem não ter SUPABASE_ANON_KEY.
+    const chavePublica = Deno.env.get('SUPABASE_ANON_KEY') || 'sb_publishable_nBsq0Xy8Vi6ZBrbL_BrzdQ_c3JNnBrO';
+    const sb = createClient(Deno.env.get('SUPABASE_URL') || 'https://lmazvxvudbhoivgvhbin.supabase.co', chavePublica, {
       global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
     });
     const { data: { user } } = await sb.auth.getUser();
