@@ -22,6 +22,7 @@
     <nav id="nav" class="nav" hidden>
       <a href="#" data-ir="app" class="ativo">Preços</a>
       <a href="magalu/">Magalu</a>
+      <a href="#assistente" data-ir="assistente">Assistente</a>
       <a href="#usuarios" data-ir="usuarios" id="nav-admin" hidden>Usuários</a>
     </nav>
     <div id="user-box" class="user-box" hidden>
@@ -94,6 +95,26 @@
         <span><b>Enviar arquivos da Magalu</b><br><small>Clique para escolher os JSON</small></span>
       </label>
       <p id="magalu-msg" class="msg" role="status"></p>
+    </section>
+  </main>
+
+  <!-- Assistente (Gemini) -->
+  <main id="view-assistente" hidden>
+    <section class="panel chat">
+      <div class="panel-head">
+        <h2>Assistente <small class="muted">IA (Google Gemini)</small></h2>
+        <button id="chat-limpar" class="ghost">Nova conversa</button>
+      </div>
+      <div id="chat-lista" class="chat-lista" aria-live="polite"></div>
+      <form id="chat-form" class="chat-form">
+        <textarea id="chat-texto" rows="2" placeholder="Escreva sua pergunta… (Enter envia, Shift+Enter quebra linha)"></textarea>
+        <button id="chat-enviar" class="primary" type="submit">Enviar</button>
+      </form>
+      <div class="chat-opcoes">
+        <label class="check"><input id="ctx-precos" type="checkbox" checked> Usar meus dados de preços (Shopping Radar)</label>
+        <label class="check"><input id="ctx-magalu" type="checkbox"> Usar dados de vendas da Magalu</label>
+      </div>
+      <p class="muted chat-aviso">No plano gratuito do Gemini, o Google pode usar o conteúdo enviado para melhorar os serviços dele. Marque os dados só quando precisar deles na resposta.</p>
     </section>
   </main>
 
@@ -176,5 +197,6 @@
   <script src="config.js"></script>
   <script src="processamento.js"></script>
   <script src="app.js"></script>
+  <script src="assistente.js"></script>
 </body>
 </html>

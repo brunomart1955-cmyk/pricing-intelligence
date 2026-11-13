@@ -20,7 +20,7 @@
 
   // ---------- Telas ----------
   function mostrar(tela) {
-    ['setup', 'auth', 'pendente', 'app', 'usuarios'].forEach(t => { $(`#view-${t}`).hidden = t !== tela; });
+    ['setup', 'auth', 'pendente', 'app', 'usuarios', 'assistente'].forEach(t => { $(`#view-${t}`).hidden = t !== tela; });
   }
   function msg(el, texto, tipo) { el.textContent = texto || ''; el.className = `msg ${tipo || ''}`; }
 
@@ -394,7 +394,8 @@
     $('#nav').hidden = false;
     $('#nav-admin').hidden = !acesso.admin;
     store = storeSupabase;
-    irPara(location.hash === '#usuarios' && acesso.admin ? 'usuarios' : 'app');
+    const destino = location.hash.slice(1);
+    irPara(destino === 'usuarios' && acesso.admin ? 'usuarios' : destino === 'assistente' ? 'assistente' : 'app');
     carregar();
   }
 
@@ -464,7 +465,7 @@
   function ligarAcesso() {
     document.querySelectorAll('#nav [data-ir]').forEach(a => a.addEventListener('click', e => {
       e.preventDefault();
-      history.replaceState(null, '', a.dataset.ir === 'usuarios' ? '#usuarios' : '#');
+      history.replaceState(null, '', a.dataset.ir === 'app' ? '#' : '#' + a.dataset.ir);
       irPara(a.dataset.ir);
     }));
     $('#pend-recheck').addEventListener('click', async () => {
@@ -478,6 +479,9 @@
     });
     $('#magalu-input').addEventListener('change', e => { enviarArquivosMagalu(e.target.files); e.target.value = ''; });
   }
+
+  // Usado pela aba Assistente (assistente.js).
+  window.SRApp = { sb, P, getOfertas: () => ofertas };
 
   // ---------- Início ----------
   ligarEventos();
