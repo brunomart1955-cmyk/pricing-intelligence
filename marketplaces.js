@@ -220,3 +220,28 @@ chrome.runtime.onMessage.addListener(message => {
     searchStatus.textContent = `Buscando em ${message.source}… (${message.completed}/${message.total})`;
   }
 });
+
+// Exportar JSON: gera um arquivo com TODOS os dados coletados (Google Shopping
+// + marketplaces) no formato aceito pelo painel web (shopping-radar-painel).
+document.querySelector('#export-json-btn').addEventListener('click', () => {
+  chrome.storage.local.get(['shoppingRadarData','marketplaceRadarData'], values => {
+    const payload = {
+      app: 'shopping-radar',
+      formato: 1,
+      versao: chrome.runtime.getManifest().version,
+      exportadoEm: new Date().toISOString(),
+      google: values.shoppingRadarData || null,
+      marketplaces: values.marketplaceRadarData || {}
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `shopping-radar-${stamp}.json`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  });
+});

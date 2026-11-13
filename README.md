@@ -52,3 +52,7 @@ Esses dois foram adicionados com a mesma lógica dos demais, mas com uma ressalv
 3. Clique em **Carregar sem compactação**.
 4. Selecione esta pasta.
 5. Recarregue a extensão após atualizações e abra uma busca ou anúncio em um marketplace suportado.
+
+## Exportar JSON e painel web
+
+No dashboard de Marketplaces, o botão **⬇ Exportar JSON** baixa um arquivo com todos os dados coletados (Google Shopping + marketplaces). Esse arquivo pode ser importado no painel web [shopping-radar-painel](https://github.com/brunomart1955-cmyk/shopping-radar-painel), que tem login, salva o histórico de cada usuário e mostra gráficos. A extensão em si continua sem login e sem credenciais.
