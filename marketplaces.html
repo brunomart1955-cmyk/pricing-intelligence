@@ -1,0 +1,58 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="dashboard.css"><title>Shopping Radar - Marketplaces</title></head><body>
+<header>
+  <div>
+    <span class="kicker">SHOPPING RADAR</span>
+    <h1>Marketplaces</h1>
+    <p>Resultados coletados em Mercado Livre, Magalu, Shopee, Amazon, AliExpress e Shop Coopera.</p>
+  </div>
+  <a class="nav-link" href="dashboard.html">Google Shopping</a>
+  <div class="dashboard-search">
+    <label for="filter">Pesquisar nos resultados</label>
+    <input id="filter" type="search" placeholder="Produto ou loja...">
+  </div>
+</header>
+<main>
+
+  <section class="search-all">
+    <div>
+      <label for="search-query">Buscar em todos os marketplaces</label>
+      <input id="search-query" type="search" placeholder="Ex.: martelete bosch">
+    </div>
+    <button id="search-all-btn">🔎 Buscar em todos</button>
+    <button id="reload-btn" title="Reler o armazenamento e atualizar o painel">↻ Atualizar</button>
+    <span id="search-status" class="search-status"></span>
+  </section>
+
+  <nav id="tabs" class="tabs"></nav>
+
+  <section class="controls">
+    <div><label for="my-item">Seu item</label><input id="my-item" placeholder="Ex.: Martelete Bosch"></div>
+    <div><label for="own-price">Seu preço</label><input id="own-price" inputmode="decimal" placeholder="Ex.: 952,00"></div>
+    <label class="toggle"><input id="only-promo" type="checkbox"> Só promoção</label>
+    <label class="toggle"><input id="only-shipping" type="checkbox"> Só frete grátis</label>
+    <label class="toggle"><input id="show-images" type="checkbox"> Mostrar imagens</label>
+    <label class="toggle"><input id="show-unavailable" type="checkbox"> Mostrar links indisponíveis</label>
+  </section>
+
+  <section class="metrics">
+    <article><small>Ofertas</small><strong id="total">—</strong></article>
+    <article><small>Menor preço</small><strong id="minimum">—</strong></article>
+    <article><small>Preço médio</small><strong id="average">—</strong></article>
+    <article><small>Seu preço</small><strong id="my-price">—</strong></article>
+  </section>
+
+  <section class="heading">
+    <h2 id="results-title">Ofertas</h2>
+    <div class="heading-actions">
+      <span id="updated"></span>
+      <button id="export-csv-btn" title="Exportar a lista visível para CSV">⬇ Exportar CSV</button>
+      <button id="clear-btn" title="Limpar os dados salvos desta aba">🗑 Limpar</button>
+    </div>
+  </section>
+
+  <div id="progress-wrap" class="progress-wrap" hidden><div id="progress-bar" class="progress-bar"></div><span id="progress-label" class="progress-label"></span></div>
+
+  <section id="results" class="results"></section>
+</main>
+<script src="marketplaces.js"></script>
+</body></html>
