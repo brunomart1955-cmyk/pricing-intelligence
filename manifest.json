@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Shopping Radar",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Painel de inteligência de preços com leitura local dos marketplaces e sincronização com o painel online.",
   "permissions": [
     "storage",
@@ -49,6 +49,13 @@
     }
   ],
   "host_permissions": [
-    "https://lmazvxvudbhoivgvhbin.supabase.co/*"
+    "https://lmazvxvudbhoivgvhbin.supabase.co/*",
+    "https://*.mercadolivre.com.br/*",
+    "https://*.mercadolibre.com/*",
+    "https://*.magazineluiza.com.br/*",
+    "https://shopee.com.br/*",
+    "https://*.amazon.com.br/*",
+    "https://*.aliexpress.com/*",
+    "https://*.shopcoopera.com.br/*"
   ]
 }

@@ -2,6 +2,16 @@
 
 Extensão Chrome Manifest V3 para monitorar preços no Google Shopping, Mercado Livre, Magalu, Shopee, Amazon, AliExpress e Shop Coopera.
 
+## Leitura dos anúncios sem abrir abas (v2.4.0)
+
+Por padrão a extensão **não abre mais abas** para ler os detalhes dos anúncios: ela baixa o HTML de cada anúncio em segundo plano (até 3 ao mesmo tempo) e lê vendedor, vendas, avaliações e tempo de loja direto desse HTML.
+
+- Se o marketplace responder com a página de verificação anti-robô, só aquele anúncio é lido abrindo a página numa **janela minimizada separada**, que fecha sozinha ao terminar.
+- A opção **"Leitura completa (janela minimizada)"**, no dashboard de Marketplaces, faz todos os anúncios serem lidos dessa forma — útil para dados que a página só monta via JavaScript (Shopee, data da avaliação mais antiga).
+- "Buscar em todos" também abre as buscas nessa janela minimizada, nunca na janela em uso.
+
+As seções abaixo descrevem o funcionamento da leitura por abas, que continua valendo para o modo completo.
+
 ## Como são obtidos os dados
 
 A extensão não chama APIs nem usa credenciais. Para completar um card, ela abre o próprio link público do anúncio em uma fila controlada e lê somente o HTML que o marketplace entrega para aquela página.

@@ -398,6 +398,20 @@
     chrome.storage.local.remove('marketplaceRadarProgress');
   }
 
+  // No modo sem abas o background devolve o HTML do anúncio ({ html }); aqui
+  // ele vira um documento e passa pelos mesmos leitores da página aberta.
+  // No modo "Leitura completa" os dados já chegam prontos da aba.
+  function dadosDoAnuncio(resposta) {
+    if (!resposta) return {};
+    if (typeof resposta.html !== 'string') return resposta;
+    try {
+      const doc = new DOMParser().parseFromString(resposta.html, 'text/html');
+      return readVisibleProductData(doc);
+    } catch (_) {
+      return {};
+    }
+  }
+
   async function enrichCardsFromPages() {
     const unchecked = products.filter(product => product.url && !isChecked(product.url));
     const pending = unchecked.slice(0, DETAIL_BATCH_LIMIT);
@@ -413,7 +427,7 @@
     try {
       const response = await chrome.runtime.sendMessage({ type: 'read-product-pages', products: pending });
       for (const product of pending) {
-        const { reviewPageUrl, ...data } = response?.data?.[product.url] || {};
+        const { reviewPageUrl, ...data } = dadosDoAnuncio(response?.data?.[product.url]);
         const key = productKey(product.url);
         // Se nenhum campo veio preenchido, é mais provável que a aba não
         // teve tempo de terminar do que o anúncio realmente não ter nada —

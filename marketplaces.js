@@ -245,3 +245,16 @@ document.querySelector('#export-json-btn').addEventListener('click', () => {
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   });
 });
+
+
+// Modo de leitura dos anúncios: sem abas (padrão) ou completa (janela minimizada).
+(() => {
+  const box = document.querySelector('#leitura-completa');
+  if (!box) return;
+  chrome.storage.local.get('radarConfig', ({ radarConfig = {} }) => { box.checked = Boolean(radarConfig.leituraCompleta); });
+  box.addEventListener('change', () => {
+    chrome.storage.local.get('radarConfig', ({ radarConfig = {} }) => {
+      chrome.storage.local.set({ radarConfig: { ...radarConfig, leituraCompleta: box.checked } });
+    });
+  });
+})();

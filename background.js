@@ -23,7 +23,80 @@ const PAGE_RENDER_DELAY_RANGE = [1800, 3000];
 const DETAIL_CONCURRENCY = 3;
 const SEARCH_CONCURRENCY = 4; // domínios diferentes, então aguenta mais abas juntas
 
+const FETCH_CONCURRENCY = 3; // downloads de página simultâneos (modo sem abas)
+const FETCH_TIMEOUT = 20000;
+const PAGINA_BLOQUEIO = /suspicious-traffic|account-verification|negative_traffic|validateCaptcha|Robot Check/i;
+
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// ---------- Leitura sem abas ----------
+// Baixa o HTML do anúncio e devolve só o necessário para o content script
+// interpretar com os mesmos leitores (readVisibleProductData). Scripts,
+// estilos e SVGs saem para a mensagem ficar leve; o espaço entre tags evita
+// que textos de elementos vizinhos grudem ("4.8+500 vendidos").
+async function baixarPagina(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT);
+  try {
+    await wait(jitter([200, 700]));
+    const resp = await fetch(url, { credentials: 'include', signal: ctrl.signal, headers: { Accept: 'text/html' } });
+    if (!resp.ok) return null;
+    let html = await resp.text();
+    html = html
+      .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<svg\b[\s\S]*?<\/svg>/gi, ' ')
+      .replace(/></g, '> <');
+    // Página de verificação anti-robô do marketplace (testada sem os scripts,
+    // para não confundir com um reCAPTCHA embutido numa página normal).
+    if (PAGINA_BLOQUEIO.test(html)) return { bloqueado: true };
+    return { html: html.slice(0, 2_000_000), finalUrl: resp.url };
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---------- Janela minimizada para as abas ----------
+// Quando abas são realmente necessárias ("Leitura completa" e "Buscar em
+// todos"), elas abrem numa janela minimizada própria, sem bagunçar a janela
+// em que a pessoa está trabalhando. A janela fecha sozinha quando a fila acaba.
+let janelaOculta = null; // Promise<windowId>
+let abasOcultasAtivas = 0;
+let fecharJanelaTimer = null;
+
+chrome.windows.onRemoved.addListener(id => {
+  if (janelaOculta) janelaOculta.then(w => { if (w === id) janelaOculta = null; }).catch(() => {});
+});
+
+async function criarAbaOculta(url) {
+  clearTimeout(fecharJanelaTimer);
+  abasOcultasAtivas += 1;
+  for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+    try {
+      if (!janelaOculta) {
+        janelaOculta = chrome.windows.create({ url: 'about:blank', state: 'minimized', focused: false }).then(w => w.id);
+      }
+      const windowId = await janelaOculta;
+      return await chrome.tabs.create({ windowId, url, active: false });
+    } catch (_) {
+      janelaOculta = null; // janela fechada pelo usuário: cria outra
+    }
+  }
+  return chrome.tabs.create({ url, active: false });
+}
+
+function liberarAbaOculta() {
+  abasOcultasAtivas = Math.max(0, abasOcultasAtivas - 1);
+  if (abasOcultasAtivas) return;
+  clearTimeout(fecharJanelaTimer);
+  fecharJanelaTimer = setTimeout(async () => {
+    if (abasOcultasAtivas || !janelaOculta) return;
+    try { await chrome.windows.remove(await janelaOculta); } catch (_) { /* já fechada */ }
+    janelaOculta = null;
+  }, 4000);
+}
 const jitter = ([min, max]) => Math.round(min + Math.random() * (max - min));
 
 // Processa "items" com no máximo "concurrency" workers rodando ao mesmo
@@ -70,6 +143,7 @@ function openPageAndRead(url) {
       if (tabId) {
         try { await chrome.tabs.remove(tabId); } catch (_) { /* tab já fechada */ }
       }
+      liberarAbaOculta();
       resolve(value || null);
     };
     const onUpdated = async (updatedTabId, changeInfo) => {
@@ -87,8 +161,10 @@ function openPageAndRead(url) {
     const timeout = setTimeout(() => void finish(null), PAGE_READY_TIMEOUT);
     chrome.tabs.onUpdated.addListener(onUpdated);
     try {
-      const tab = await chrome.tabs.create({ url, active: false });
+      const tab = await criarAbaOculta(url);
       tabId = tab.id;
+      // O tempo-limite pode ter vencido enquanto a aba era criada.
+      if (settled) chrome.tabs.remove(tabId).catch(() => {});
     } catch (_) {
       await finish(null);
     }
@@ -130,6 +206,7 @@ function openSearchTab(url) {
       if (tabId) {
         try { await chrome.tabs.remove(tabId); } catch (_) { /* tab já fechada */ }
       }
+      liberarAbaOculta();
       resolve();
     };
     const onUpdated = (updatedTabId, changeInfo) => {
@@ -139,8 +216,10 @@ function openSearchTab(url) {
     const timeout = setTimeout(() => void finish(), SEARCH_TAB_TIMEOUT);
     chrome.tabs.onUpdated.addListener(onUpdated);
     try {
-      const tab = await chrome.tabs.create({ url, active: false });
+      const tab = await criarAbaOculta(url);
       tabId = tab.id;
+      // O tempo-limite pode ter vencido enquanto a aba era criada.
+      if (settled) chrome.tabs.remove(tabId).catch(() => {});
     } catch (_) {
       await finish();
     }
@@ -193,19 +272,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     const data = {};
     let completed = 0;
-    // Até DETAIL_CONCURRENCY abas abertas ao mesmo tempo — rápido, mas sem
-    // deixar várias abas do mesmo marketplace competindo entre si a ponto de
-    // a leitura de opiniões não ter tempo de terminar (foi o que causou os
-    // cards voltando com "não visível" em tudo).
+    // Padrão: baixa o HTML de cada anúncio em segundo plano, SEM abrir abas.
+    // "Leitura completa" (opção no dashboard) volta a abrir os anúncios, mas
+    // numa janela minimizada separada — necessário só para dados que a página
+    // monta via JavaScript (ex.: Shopee, data da avaliação mais antiga).
+    const { radarConfig = {} } = await chrome.storage.local.get('radarConfig');
+    const completa = Boolean(radarConfig.leituraCompleta);
     await runPool(entries, async product => {
-      const pageData = await openPageAndRead(product.url);
+      let pageData = completa ? await openPageAndRead(product.url) : await baixarPagina(product.url);
+      // Download bloqueado pelo marketplace: lê esse anúncio pela janela minimizada.
+      if (pageData?.bloqueado) pageData = await openPageAndRead(product.url);
       if (pageData) data[product.url] = pageData;
       completed += 1;
       if (sender.tab?.id) {
         chrome.tabs.sendMessage(sender.tab.id, { type: 'product-page-progress', completed, total: entries.length }).catch(() => {});
       }
-    }, DETAIL_CONCURRENCY);
-    sendResponse({ ok: true, data });
+    }, completa ? DETAIL_CONCURRENCY : FETCH_CONCURRENCY);
+    sendResponse({ ok: true, data, modo: completa ? 'completa' : 'rapida' });
   })().catch(error => sendResponse({ ok: false, error: error.message }));
   return true;
 });
