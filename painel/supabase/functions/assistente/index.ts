@@ -71,6 +71,8 @@ Deno.serve(async (req) => {
         generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
       }),
     });
+    const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const sobrecarga = (status: number) => status === 503 || status === 500;
     let resp = await chamar(modelo);
     let dados = await resp.json().catch(() => ({}));
     // Modelo aposentado: o Google costuma sugerir o substituto ("use models/xxx").
@@ -81,10 +83,24 @@ Deno.serve(async (req) => {
       resp = await chamar(modelo);
       dados = await resp.json().catch(() => ({}));
     }
+    // Gemini sobrecarregado ("high demand"): espera um pouco e tenta de novo;
+    // se continuar, cai para a versão "lite" do mesmo modelo (costuma estar livre).
+    if (sobrecarga(resp.status)) {
+      const tentativas = [modelo, ...(/-lite$/.test(modelo) ? [] : [`${modelo}-lite`])];
+      for (const m of tentativas) {
+        await espera(1500);
+        const r = await chamar(m);
+        const d = await r.json().catch(() => ({}));
+        if (r.ok || !sobrecarga(r.status) && r.status !== 404) { resp = r; dados = d; modelo = m; }
+        if (r.ok) break;
+      }
+    }
     if (!resp.ok) {
       const msg = resp.status === 429
         ? 'Limite gratuito do Gemini atingido no momento. Espere um minuto e tente de novo.'
-        : `Gemini respondeu com erro: ${dados?.error?.message ?? resp.status}`;
+        : sobrecarga(resp.status)
+          ? 'O Gemini está sobrecarregado agora (alta demanda no Google). Tente de novo em alguns minutos.'
+          : `Gemini respondeu com erro: ${dados?.error?.message ?? resp.status}`;
       return json({ erro: msg }, 502);
     }
     const texto = (dados?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? '').join('').trim();
