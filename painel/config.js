@@ -3,6 +3,6 @@
 // são as regras de segurança (RLS) do arquivo supabase.sql.
 // NUNCA coloque aqui a "service_role key".
 window.SR_CONFIG = {
-  supabaseUrl: '',      // ex.: 'https://abcdxyz.supabase.co'
-  supabaseAnonKey: ''   // ex.: 'eyJhbGciOiJIUzI1NiIs...'
+  supabaseUrl: 'https://lmazvxvudbhoivgvhbin.supabase.co',      // ex.: 'https://abcdxyz.supabase.co'
+  supabaseAnonKey: 'sb_publishable_nBsq0Xy8Vi6ZBrbL_BrzdQ_c3JNnBrO'   // ex.: 'eyJhbGciOiJIUzI1NiIs...'
 };
