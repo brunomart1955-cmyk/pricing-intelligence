@@ -61,8 +61,8 @@ Deno.serve(async (req) => {
     }
     const contexto = typeof corpo.contexto === 'string' ? corpo.contexto.slice(0, MAX_CONTEXTO) : '';
 
-    const modelo = Deno.env.get('GEMINI_MODEL') || MODELO_PADRAO;
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelo)}:generateContent`, {
+    let modelo = Deno.env.get('GEMINI_MODEL') || MODELO_PADRAO;
+    const chamar = (m: string) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': chave },
       body: JSON.stringify({
@@ -71,7 +71,16 @@ Deno.serve(async (req) => {
         generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
       }),
     });
-    const dados = await resp.json().catch(() => ({}));
+    let resp = await chamar(modelo);
+    let dados = await resp.json().catch(() => ({}));
+    // Modelo aposentado: o Google costuma sugerir o substituto ("use models/xxx").
+    // Nesse caso tenta de novo, uma vez, com o modelo sugerido.
+    const sugerido = !resp.ok && String(dados?.error?.message ?? '').match(/use models\/([\w.-]+)/i)?.[1];
+    if (sugerido && sugerido !== modelo) {
+      modelo = sugerido;
+      resp = await chamar(modelo);
+      dados = await resp.json().catch(() => ({}));
+    }
     if (!resp.ok) {
       const msg = resp.status === 429
         ? 'Limite gratuito do Gemini atingido no momento. Espere um minuto e tente de novo.'
